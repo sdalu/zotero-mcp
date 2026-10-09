@@ -3,7 +3,9 @@
 # AllCops: TargetRubyVersion follows the gemspec's required_ruby_version
 # (3.2), not the guide's 3.4; and vendors/ (Bundler's install path here)
 # is excluded, since gems installed there carry their own .rubocop.yml;
-# SuggestExtensions is off, so the run ends on its verdict.
+# SuggestExtensions is off, so the run ends on its verdict. The Exclude
+# list is merged with RuboCop's defaults (which skip vendor/, where CI
+# installs gems) rather than replacing them.
 
 # rubocop.yml — the executable form of SKILL.md's §7 "General Rules (Quick
 # Reference)" table, plus the §1 file-header rule (frozen_string_literal).
@@ -32,6 +34,10 @@
 # fixtures: compliant ones clean, planted ones not). Three default cops that
 # fire on code written exactly as SKILL.md's own examples are disabled below,
 # with the example that settles each.
+
+inherit_mode:
+  merge:
+    - Exclude
 
 AllCops:
   TargetRubyVersion: 3.2
