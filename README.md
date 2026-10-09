@@ -148,7 +148,7 @@ or under `vendors/ruby/<ABI>` (what `bundle install` produces when Bundler's
 
 ```bash
 rake test            # or: ruby test/all.rb
-ruby test/client_test.rb   # a single file
+ruby test/retry_test.rb    # a single file
 ```
 
 ## Notes and safety

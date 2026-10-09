@@ -7,7 +7,8 @@ A Zotero MCP server in one Ruby file.
 - `README.md` -- tools, setup, environment variables, troubleshooting
 - `DESIGN.md` -- why it is shaped this way
 - `CHECKLIST.md` -- what closes a round; read it before committing
-- `lib/zotero/mcp.rb` -- the whole server
+- `lib/zotero/mcp.rb` -- loads the parts, lists `TOOLS`, builds the server
+- `lib/zotero/mcp/` -- one file per part; `lib/zotero/mcp/tools/` -- one file per tool
 - `lib/zotero/mcp/version.rb` -- `Zotero::MCP::VERSION`, the release
 - `exe/zotero-mcp` -- the launcher, for a checkout and for the gem
 - `zotero-mcp.gemspec` -- packaging
@@ -15,7 +16,7 @@ A Zotero MCP server in one Ruby file.
 
 ## Gate
 
-Gate: `ruby -wc lib/zotero/mcp.rb && rake test`
+Gate: `rubocop && rake test`, then the warning check in `CHECKLIST.md`
 
 ## Traps
 

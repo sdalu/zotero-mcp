@@ -7,8 +7,10 @@
 # such as minitest stay reachable) before loading the server.
 vendor_root = File.expand_path("../vendors/ruby", __dir__)
 if Dir.exist?(vendor_root)
-    match = Dir.children(vendor_root).find { |dir| dir == Gem.ruby_api_version } ||
-        Dir.children(vendor_root).max
+    match = Dir.children(vendor_root).find do |dir|
+        dir == Gem.ruby_api_version
+    end ||
+            Dir.children(vendor_root).max
     ENV["GEM_PATH"] = [File.join(vendor_root, match), *Gem.path].join(File::PATH_SEPARATOR)
     Gem.clear_paths
 end
@@ -26,14 +28,15 @@ module TestSupport
     }.freeze
 
     def build_config(**overrides)
-        Zotero::MCP::Config.new(**DEFAULT_CONFIG.merge(overrides))
+        Zotero::MCP::Config.new(**DEFAULT_CONFIG, **overrides)
     end
 
     # Build a FakeResponse the way the real Client sees it: a string body and
     # string-keyed headers. A non-string body is JSON-encoded for convenience.
     def resp(code: "200", body: "", headers: {})
         body = JSON.dump(body) unless body.is_a?(String)
-        Zotero::MCP::FakeResponse.new(code: code.to_s, body: body, headers: headers)
+        Zotero::MCP::FakeResponse.new(code: code.to_s, body: body,
+                                      headers: headers)
     end
 
     # A Client subclass that records outgoing requests and returns canned
@@ -67,8 +70,8 @@ module TestSupport
         end
     end
 
-    def stub_client(config = build_config, &responder)
-        StubClient.new(config, &responder)
+    def stub_client(config = build_config, &)
+        StubClient.new(config, &)
     end
 
     # Decode the JSON payload carried by an MCP tool text response.
@@ -88,11 +91,15 @@ module TestSupport
 
     # Run a block with a patched ENV, restoring the originals afterwards.
     def with_env(vars)
-        saved = vars.keys.to_h { |key| [key, ENV[key]] }
-        vars.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+        saved = vars.keys.to_h { |key| [key, ENV.fetch(key, nil)] }
+        vars.each do |key, value|
+            value.nil? ? ENV.delete(key) : ENV[key] = value
+        end
         yield
     ensure
-        saved.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+        saved.each do |key, value|
+            value.nil? ? ENV.delete(key) : ENV[key] = value
+        end
     end
 end
 

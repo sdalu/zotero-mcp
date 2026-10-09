@@ -3,11 +3,16 @@
 Why the Zotero MCP server is shaped the way it is. How to install and use
 it is in `README.md`.
 
-## One library file, standard library HTTP
+## Small files, standard library HTTP
 
-The whole server is `lib/zotero/mcp.rb`; `lib/zotero/mcp/version.rb`
-holds only the version, so the gemspec can read it without loading the
-`mcp` gem. One launcher, `exe/zotero-mcp`, calls `Zotero::MCP.run`; the
+`lib/zotero/mcp.rb` loads the parts and assembles the server; each part
+is its own file under `lib/zotero/mcp/` (errors, configuration, the
+HTTP client and its response handling, the read and write endpoints,
+formatting, full text), and each tool is a file under
+`lib/zotero/mcp/tools/`. Files stay short enough for the house style's
+size limits, so a change to one tool reads as a change to one file.
+`lib/zotero/mcp/version.rb` holds only the version, so the gemspec can
+read it without loading the `mcp` gem. One launcher, `exe/zotero-mcp`, calls `Zotero::MCP.run`; the
 gem installs it on the `PATH`, and a checkout runs the same file
 through Bundler. The only dependency is the `mcp` gem; HTTP goes
 through `Net::HTTP`. A REST client gem would save little: the Zotero API

@@ -26,7 +26,7 @@ class GemspecTest < Minitest::Test
         lock = File.read(File.join(ROOT, "Gemfile.lock"))
         recorded = lock[/^    zotero-mcp \(([^)]+)\)$/, 1]
         assert_equal Zotero::MCP::VERSION, recorded,
-            "Gemfile.lock is stale: run `bundle lock --local`"
+                     "Gemfile.lock is stale: run `bundle lock --local`"
     end
 
     def test_files_ship_the_library_and_the_executable
@@ -34,7 +34,11 @@ class GemspecTest < Minitest::Test
         assert_includes spec.files, "lib/zotero/mcp/version.rb"
         assert_includes spec.files, "exe/zotero-mcp"
         assert_equal ["zotero-mcp"], spec.executables
-        spec.files.each do |file|
+        assert_all_files_exist(spec.files)
+    end
+
+    def assert_all_files_exist(files)
+        files.each do |file|
             assert File.file?(File.join(ROOT, file)), "missing: #{file}"
         end
     end

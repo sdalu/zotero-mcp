@@ -16,10 +16,11 @@ class ServerTest < Minitest::Test
     end
 
     def test_initialize_reports_the_version_constant
+        client_info = { name: "test", version: "0" }
         result = rpc("initialize", protocolVersion: "2025-06-18",
-            capabilities: {}, clientInfo: { name: "test", version: "0" })
+                                   capabilities: {}, clientInfo: client_info)
         assert_equal Zotero::MCP::VERSION, result.dig("result", "serverInfo",
-            "version")
+                                                      "version")
     end
 
     def test_tools_list_names_every_tool_with_an_object_schema
@@ -27,22 +28,25 @@ class ServerTest < Minitest::Test
         names = tools.map { |tool| tool["name"] }
         assert_equal Zotero::MCP::TOOLS.map(&:name_value).sort, names.sort
         assert_equal 14, names.length
-        tools.each do |tool|
-            assert_equal "object", tool.dig("inputSchema", "type"), tool["name"]
-            refute_empty tool["description"].to_s.strip, tool["name"]
-        end
+        tools.each { |tool| assert_tool_schema_present(tool) }
+    end
+
+    def assert_tool_schema_present(tool)
+        assert_equal "object", tool.dig("inputSchema", "type"), tool["name"]
+        refute_empty tool["description"].to_s.strip, tool["name"]
     end
 
     def test_tools_list_carries_the_declared_enums
         tools = rpc("tools/list").dig("result", "tools")
         search = tools.find { |tool| tool["name"] == "zotero_search_items" }
         assert_equal %w[asc desc],
-            search.dig("inputSchema", "properties", "direction", "enum")
+                     search.dig("inputSchema", "properties", "direction",
+                                "enum")
     end
 
     def test_tool_call_refusal_is_flagged_as_error_on_the_wire
         result = rpc("tools/call", name: "zotero_delete_item",
-            arguments: { item_keys: [] })
+                                   arguments: { item_keys: [] })
         assert_equal true, result.dig("result", "isError")
         text = result.dig("result", "content", 0, "text")
         assert_match(/at least one item key/, JSON.parse(text)["error"])

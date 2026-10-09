@@ -1,0 +1,135 @@
+# Copied from the house Ruby style guide's rubocop.yml (the ruby skill,
+# scripts/rubocop.yml); keep in step with it. Project changes, both in
+# AllCops: TargetRubyVersion follows the gemspec's required_ruby_version
+# (3.2), not the guide's 3.4; and vendors/ (Bundler's install path here)
+# is excluded, since gems installed there carry their own .rubocop.yml.
+
+# rubocop.yml — the executable form of SKILL.md's §7 "General Rules (Quick
+# Reference)" table, plus the §1 file-header rule (frozen_string_literal).
+# Run: rubocop -c <skill>/scripts/rubocop.yml <files>
+#
+# Not enforceable by RuboCop (kept here as documentation only — these table
+# rows have no cop, or only a partial one, so judgement still applies):
+#   - Parentheses: "include when chaining or ambiguous" — RuboCop can enforce
+#     omitting parens on no-arg calls (Style/MethodCallWithoutArgsParentheses,
+#     below) but has no cop that judges "chaining" or "ambiguous" contexts.
+#   - unless: "only for simple negation" — approximated below by forbidding
+#     unless with mixed &&/|| conditions (Style/UnlessLogicalOperators), but
+#     RuboCop cannot judge whether a single condition is "simple".
+#   - until: "prefer `while !` for clarity unless the condition reads
+#     naturally" — RuboCop's only related cop (Style/NegatedWhile) enforces
+#     the OPPOSITE default (prefer `until` over `while !`), so it is disabled
+#     below rather than left fighting the house style. No cop can positively
+#     enforce "prefer while !".
+#   - attr_reader / attr_accessor: "use attr_accessor sparingly" — RuboCop can
+#     flag manual accessor methods that should become attr_reader/attr_writer
+#     (Style/TrivialAccessors, below) but has no cop that counts or caps
+#     attr_accessor usage.
+#
+# Verified against RuboCop 1.90.0 on 2026-09-02 (`rubocop --show-cops` loads
+# the file without warnings; tests/evals/check-fixtures.py runs it over the
+# fixtures: compliant ones clean, planted ones not). Three default cops that
+# fire on code written exactly as SKILL.md's own examples are disabled below,
+# with the example that settles each.
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  Exclude:
+    - "vendors/**/*"
+
+# --- Strings: double quotes everywhere (SKILL.md §3) ------------------------
+# RuboCop's default for these two cops is single_quotes, which would fail
+# every file written to the guide; set explicitly (added 2026-09-02).
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+# --- Indentation: 4 spaces, no tabs -----------------------------------------
+Layout/IndentationWidth:
+  Width: 4
+
+Layout/IndentationStyle:
+  EnforcedStyle: spaces
+
+Layout/IndentationConsistency:
+  EnforcedStyle: normal
+
+# --- Line length: 80 chars max -----------------------------------------------
+Layout/LineLength:
+  Max: 80
+
+# --- Method length: <= 10 lines; extract otherwise ---------------------------
+Metrics/MethodLength:
+  Max: 10
+
+# --- Class length: <= 100 lines; split otherwise ------------------------------
+Metrics/ClassLength:
+  Max: 100
+
+# --- Trailing whitespace: never -----------------------------------------------
+Layout/TrailingWhitespace:
+  Enabled: true
+  AllowInHeredoc: false
+
+# --- Semicolons: never on the same line ---------------------------------------
+Style/Semicolon:
+  Enabled: true
+
+# --- Parentheses: omit on method calls with no args ---------------------------
+# (see "Not enforceable" note above for the chaining/ambiguous half)
+Style/MethodCallWithoutArgsParentheses:
+  Enabled: true   # the cop has no EnforcedStyle; enabled is "no parens"
+
+# --- unless: no unless/else; "simple negation" approximated ------------------
+Style/UnlessElse:
+  Enabled: true
+
+Style/UnlessLogicalOperators:
+  Enabled: true
+  EnforcedStyle: forbid_mixed_logical_operators
+
+# --- until: no cop enforces "prefer while !"; disable the opposing cop -------
+Style/NegatedWhile:
+  Enabled: false
+
+# --- attr_reader: prefer over manual def --------------------------------------
+Style/TrivialAccessors:
+  Enabled: true
+
+# --- Boolean returns: predicate? naming; return true/false, never nil --------
+Naming/PredicatePrefix:   # was Naming/PredicateName before RuboCop 1.76
+  Enabled: true
+  ForbiddenPrefixes:
+    - is_
+    - has_
+    - have_
+
+Naming/PredicateMethod:
+  Enabled: true
+
+# --- nil checks: prefer &. safe navigation over `if x && x.method` -----------
+Style/SafeNavigation:
+  Enabled: true
+
+# --- File header: frozen_string_literal magic comment (SKILL.md §1) ----------
+Style/FrozenStringLiteralComment:
+  EnforcedStyle: always
+
+# --- Defaults switched off because SKILL.md's own examples break them --------
+# A guard is followed directly by the work in §6's charge(): no blank line
+# after `raise ArgumentError, "..." unless amount.positive?`.
+Layout/EmptyLineAfterGuardClause:
+  Enabled: false
+
+# The guide asks for a header comment on files, not a doc comment on every
+# class and module (§1); the default would fail every namespaced Error class.
+Style/Documentation:
+  Enabled: false
+
+# §5's examples are `def double(x) = x * 2`; one-letter parameters are the
+# guide's own style for trivial methods.
+Naming/MethodParameterName:
+  Enabled: false

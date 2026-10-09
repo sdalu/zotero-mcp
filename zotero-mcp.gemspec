@@ -19,10 +19,11 @@ Gem::Specification.new do |spec|
     spec.required_ruby_version = ">= 3.2"
 
     spec.files = Dir["lib/**/*.rb", "exe/*", "README.md", "DESIGN.md",
-        "LICENSE"]
+                     "LICENSE"]
     spec.bindir = "exe"
     spec.executables = ["zotero-mcp"]
     spec.require_paths = ["lib"]
 
     spec.add_dependency "mcp", "~> 0.22"
+    spec.metadata["rubygems_mfa_required"] = "true"
 end

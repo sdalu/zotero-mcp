@@ -7,7 +7,11 @@ command or a question with a yes or a no at the end of it.
 
 Run in order, from the project directory.
 
-- [ ] `ruby -wc lib/zotero/mcp.rb` -- prints `Syntax OK` and no warning.
+- [ ] `ruby -w -rbundler/setup -Ilib -e 'require "zotero/mcp"; Zotero::MCP.build_server'`
+      -- prints nothing: every file loads, with no warning.
+- [ ] `rubocop` -- `no offenses detected`. The project `.rubocop.yml` is the
+      house style; an inline disable needs a `-- reason` and a case the
+      reason covers.
 - [ ] `rake test` -- 0 failures, 0 errors. Needs the `mcp` gem (see
       README, Tests); a `LoadError` for `mcp` is a missing gem, not a pass.
 - [ ] `gem build zotero-mcp.gemspec` -- builds; then delete the `.gem`.
