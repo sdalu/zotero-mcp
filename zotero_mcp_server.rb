@@ -3,6 +3,6 @@
 
 # Checkout launcher, kept so existing MCP registrations that name this path
 # keep working; the gem installs exe/zotero-mcp for the same job.
-require_relative "lib/zotero_mcp"
+require_relative "lib/zotero/mcp"
 
-ZoteroMCP.run if $PROGRAM_NAME == __FILE__
+Zotero::MCP.run if $PROGRAM_NAME == __FILE__

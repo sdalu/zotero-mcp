@@ -2,5 +2,5 @@
 
 source "https://rubygems.org"
 
-# Runtime dependencies (the mcp gem) are declared in zotero_mcp.gemspec.
+# Runtime dependencies (the mcp gem) are declared in zotero-mcp.gemspec.
 gemspec

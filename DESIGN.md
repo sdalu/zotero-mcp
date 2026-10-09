@@ -5,14 +5,21 @@ it is in `README.md`.
 
 ## One library file, standard library HTTP
 
-The whole server is `lib/zotero_mcp.rb`; `lib/zotero_mcp/version.rb`
+The whole server is `lib/zotero/mcp.rb`; `lib/zotero/mcp/version.rb`
 holds only the version, so the gemspec can read it without loading the
-`mcp` gem. Two launchers call `ZoteroMCP.run`: `exe/zotero-mcp`, which
+`mcp` gem. Two launchers call `Zotero::MCP.run`: `exe/zotero-mcp`, which
 the gem installs on the `PATH`, and `zotero_mcp_server.rb` at the root of
 a checkout, so that a registration naming that path needs no gem install
 and keeps working. The only dependency is the `mcp` gem; HTTP goes
 through `Net::HTTP`. A REST client gem would save little: the Zotero API
 needs only GET, POST, PATCH and DELETE with a few headers.
+
+The gem is `zotero-mcp` and its code is `Zotero::MCP`, following the
+RubyGems rule that a dash in a name marks a namespace. The price is
+sharing the top-level `Zotero` module with the unrelated `zotero` gem
+(0.2.1), which defines `Zotero::VERSION`, `Zotero::Api` and
+`Zotero::Entities`. Everything here lives under `Zotero::MCP`, so the
+two can load in one process without overwriting each other's constants.
 
 ## Layers
 
@@ -20,13 +27,13 @@ needs only GET, POST, PATCH and DELETE with a few headers.
 (`request`, the status-to-exception mapping, retries). The endpoint
 methods are mixed into it from `ReadAPI` and `WriteAPI`. The `MCP::Tool`
 subclasses are thin: they validate arguments, call one client method
-inside `ZoteroMCP.guard`, and format the result. Because of this split,
+inside `Zotero::MCP.guard`, and format the result. Because of this split,
 the suite can replace `Client#perform` (the one method that touches the
 network) with a stub, and exercise everything else offline.
 
 ## Errors are results, not exceptions
 
-Every failure the server can foresee is a subclass of `ZoteroMCP::Error`.
+Every failure the server can foresee is a subclass of `Zotero::MCP::Error`.
 `guard` turns any exception into a tool result flagged `isError` and
 carrying an `error` message, so the client always gets an answer it can
 act on, and the stdio transport never sees a Ruby exception. Messages say

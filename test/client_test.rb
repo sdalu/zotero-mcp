@@ -19,10 +19,10 @@ class ClientTest < Minitest::Test
     def test_handle_maps_status_codes_to_errors
         client = stub_client
         {
-            "403" => ZoteroMCP::NotAuthorisedError,
-            "404" => ZoteroMCP::NotFoundError,
-            "412" => ZoteroMCP::ConflictError,
-            "500" => ZoteroMCP::APIError,
+            "403" => Zotero::MCP::NotAuthorisedError,
+            "404" => Zotero::MCP::NotFoundError,
+            "412" => Zotero::MCP::ConflictError,
+            "500" => Zotero::MCP::APIError,
         }.each do |code, klass|
             assert_raises(klass) { client.send(:handle, resp(code: code)) }
         end
@@ -30,12 +30,12 @@ class ClientTest < Minitest::Test
 
     def test_rate_limited_reads_retry_after_then_backoff
         client = stub_client
-        error = assert_raises(ZoteroMCP::RateLimitedError) do
+        error = assert_raises(Zotero::MCP::RateLimitedError) do
             client.send(:handle, resp(code: "429", headers: { "Retry-After" => "5" }))
         end
         assert_equal 5, error.retry_after
 
-        error = assert_raises(ZoteroMCP::RateLimitedError) do
+        error = assert_raises(Zotero::MCP::RateLimitedError) do
             client.send(:handle, resp(code: "429", headers: { "Backoff" => "3" }))
         end
         assert_equal 3, error.retry_after
@@ -43,7 +43,7 @@ class ClientTest < Minitest::Test
 
     def test_rate_limited_without_header_has_nil_retry_after
         client = stub_client
-        error = assert_raises(ZoteroMCP::RateLimitedError) do
+        error = assert_raises(Zotero::MCP::RateLimitedError) do
             client.send(:handle, resp(code: "429"))
         end
         assert_nil error.retry_after
@@ -56,7 +56,7 @@ class ClientTest < Minitest::Test
 
     def test_handle_appends_response_body_to_error_message
         client = stub_client
-        error = assert_raises(ZoteroMCP::NotAuthorisedError) do
+        error = assert_raises(Zotero::MCP::NotAuthorisedError) do
             client.send(:handle, resp(code: "403", body: "key disabled"))
         end
         assert_match(/Server said: key disabled\z/, error.message)
@@ -64,7 +64,7 @@ class ClientTest < Minitest::Test
 
     def test_handle_omits_suffix_when_body_is_blank
         client = stub_client
-        error = assert_raises(ZoteroMCP::NotFoundError) do
+        error = assert_raises(Zotero::MCP::NotFoundError) do
             client.send(:handle, resp(code: "404", body: "   "))
         end
         refute_match(/Server said/, error.message)
@@ -72,7 +72,7 @@ class ClientTest < Minitest::Test
 
     def test_handle_truncates_long_response_body
         client = stub_client
-        error = assert_raises(ZoteroMCP::APIError) do
+        error = assert_raises(Zotero::MCP::APIError) do
             client.send(:handle, resp(code: "500", body: "x" * 600))
         end
         assert_match(/Server said: #{"x" * 500}…\z/, error.message)
@@ -80,7 +80,7 @@ class ClientTest < Minitest::Test
 
     def test_rate_limited_message_includes_body_suffix
         client = stub_client
-        error = assert_raises(ZoteroMCP::RateLimitedError) do
+        error = assert_raises(Zotero::MCP::RateLimitedError) do
             client.send(:handle, resp(code: "429",
                 headers: { "Retry-After" => "5" }, body: "slow down"))
         end
@@ -93,7 +93,7 @@ class ClientTest < Minitest::Test
 
     def test_service_unavailable_with_retry_after_is_rate_limited
         client = stub_client
-        error = assert_raises(ZoteroMCP::RateLimitedError) do
+        error = assert_raises(Zotero::MCP::RateLimitedError) do
             client.send(:handle, resp(code: "503", headers: { "Retry-After" => "4" }))
         end
         assert_equal 4, error.retry_after
@@ -102,7 +102,7 @@ class ClientTest < Minitest::Test
 
     def test_service_unavailable_message_includes_body_suffix
         client = stub_client
-        error = assert_raises(ZoteroMCP::RateLimitedError) do
+        error = assert_raises(Zotero::MCP::RateLimitedError) do
             client.send(:handle, resp(code: "503",
                 headers: { "Retry-After" => "4" }, body: "maintenance"))
         end
@@ -113,7 +113,7 @@ class ClientTest < Minitest::Test
 
     def test_service_unavailable_with_backoff_is_rate_limited
         client = stub_client
-        error = assert_raises(ZoteroMCP::RateLimitedError) do
+        error = assert_raises(Zotero::MCP::RateLimitedError) do
             client.send(:handle, resp(code: "503", headers: { "Backoff" => "9" }))
         end
         assert_equal 9, error.retry_after
@@ -121,7 +121,7 @@ class ClientTest < Minitest::Test
 
     def test_service_unavailable_without_header_is_api_error
         client = stub_client
-        assert_raises(ZoteroMCP::APIError) do
+        assert_raises(Zotero::MCP::APIError) do
             client.send(:handle, resp(code: "503"))
         end
     end
@@ -159,10 +159,10 @@ class ClientTest < Minitest::Test
         client = stub_client do |_req|
             resp(code: "429", headers: { "Retry-After" => "1" })
         end
-        assert_raises(ZoteroMCP::RateLimitedError) do
+        assert_raises(Zotero::MCP::RateLimitedError) do
             client.request(:get, "/users/42/items")
         end
-        assert_equal ZoteroMCP::MAX_RETRIES, client.sleeps.length
+        assert_equal Zotero::MCP::MAX_RETRIES, client.sleeps.length
     end
 
     def test_request_does_not_retry_without_retry_after
@@ -171,7 +171,7 @@ class ClientTest < Minitest::Test
             calls += 1
             resp(code: "429")
         end
-        assert_raises(ZoteroMCP::RateLimitedError) do
+        assert_raises(Zotero::MCP::RateLimitedError) do
             client.request(:get, "/users/42/items")
         end
         assert_equal 1, calls
@@ -180,9 +180,9 @@ class ClientTest < Minitest::Test
 
     def test_request_does_not_retry_when_backoff_exceeds_cap
         client = stub_client do |_req|
-            resp(code: "429", headers: { "Retry-After" => (ZoteroMCP::MAX_BACKOFF + 1).to_s })
+            resp(code: "429", headers: { "Retry-After" => (Zotero::MCP::MAX_BACKOFF + 1).to_s })
         end
-        assert_raises(ZoteroMCP::RateLimitedError) do
+        assert_raises(Zotero::MCP::RateLimitedError) do
             client.request(:get, "/users/42/items")
         end
         assert_empty client.sleeps
@@ -209,12 +209,12 @@ class ClientTest < Minitest::Test
 
     def test_group_without_id_raises
         client = stub_client(build_config(library_type: "group", library_id: nil))
-        assert_raises(ZoteroMCP::ConfigurationError) { client.library_id }
+        assert_raises(Zotero::MCP::ConfigurationError) { client.library_id }
     end
 
     def test_user_without_key_or_id_raises
         client = stub_client(build_config(api_key: nil, library_id: nil))
-        assert_raises(ZoteroMCP::ConfigurationError) { client.library_id }
+        assert_raises(Zotero::MCP::ConfigurationError) { client.library_id }
     end
 
     def test_local_library_id_is_zero
@@ -268,7 +268,7 @@ class ClientTest < Minitest::Test
 
     def test_item_validates_key_before_requesting
         client = stub_client { |_req| resp(body: {}) }
-        assert_raises(ZoteroMCP::Error) { client.item("bad key") }
+        assert_raises(Zotero::MCP::Error) { client.item("bad key") }
         assert_empty client.requests
     end
 
@@ -414,7 +414,7 @@ class ClientTest < Minitest::Test
 
     def test_writes_blocked_on_local_config
         client = stub_client(build_config(local: true, library_id: nil))
-        assert_raises(ZoteroMCP::ReadOnlyError) do
+        assert_raises(Zotero::MCP::ReadOnlyError) do
             client.create_items([{ "itemType" => "book" }])
         end
         assert_empty client.requests
@@ -426,12 +426,12 @@ class ClientTest < Minitest::Test
 
     def test_invalid_json_raises_api_error
         client = stub_client { |_req| resp(body: "<html>not json</html>") }
-        assert_raises(ZoteroMCP::APIError) { client.item("ABCD1234") }
+        assert_raises(Zotero::MCP::APIError) { client.item("ABCD1234") }
     end
 
     def test_default_headers_carry_api_version_and_key
         headers = stub_client.send(:default_headers)
-        assert_equal ZoteroMCP::API_VERSION, headers["Zotero-API-Version"]
+        assert_equal Zotero::MCP::API_VERSION, headers["Zotero-API-Version"]
         assert_equal "KEY123", headers["Zotero-API-Key"]
     end
 

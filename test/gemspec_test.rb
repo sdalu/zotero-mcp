@@ -3,13 +3,13 @@
 require_relative "test_helper"
 
 # The packaging: the gemspec loads, ships the library and the executable,
-# and every place a version number is written agrees with ZoteroMCP::VERSION.
+# and every place a version number is written agrees with Zotero::MCP::VERSION.
 class GemspecTest < Minitest::Test
     ROOT = File.expand_path("..", __dir__)
 
     def spec
         @spec ||= Dir.chdir(ROOT) do
-            Gem::Specification.load("zotero_mcp.gemspec")
+            Gem::Specification.load("zotero-mcp.gemspec")
         end
     end
 
@@ -19,19 +19,19 @@ class GemspecTest < Minitest::Test
     end
 
     def test_gemspec_version_is_the_library_version
-        assert_equal ZoteroMCP::VERSION, spec.version.to_s
+        assert_equal Zotero::MCP::VERSION, spec.version.to_s
     end
 
     def test_lockfile_records_the_library_version
         lock = File.read(File.join(ROOT, "Gemfile.lock"))
-        recorded = lock[/^    zotero_mcp \(([^)]+)\)$/, 1]
-        assert_equal ZoteroMCP::VERSION, recorded,
+        recorded = lock[/^    zotero-mcp \(([^)]+)\)$/, 1]
+        assert_equal Zotero::MCP::VERSION, recorded,
             "Gemfile.lock is stale: run `bundle lock --local`"
     end
 
     def test_files_ship_the_library_and_the_executable
-        assert_includes spec.files, "lib/zotero_mcp.rb"
-        assert_includes spec.files, "lib/zotero_mcp/version.rb"
+        assert_includes spec.files, "lib/zotero/mcp.rb"
+        assert_includes spec.files, "lib/zotero/mcp/version.rb"
         assert_includes spec.files, "exe/zotero-mcp"
         assert_equal ["zotero-mcp"], spec.executables
         spec.files.each do |file|

@@ -7,7 +7,7 @@ require_relative "test_helper"
 # a tool call's isError flag on the wire.
 class ServerTest < Minitest::Test
     def setup
-        @server = ZoteroMCP.build_server
+        @server = Zotero::MCP.build_server
     end
 
     def rpc(method, params = {})
@@ -18,14 +18,14 @@ class ServerTest < Minitest::Test
     def test_initialize_reports_the_version_constant
         result = rpc("initialize", protocolVersion: "2025-06-18",
             capabilities: {}, clientInfo: { name: "test", version: "0" })
-        assert_equal ZoteroMCP::VERSION, result.dig("result", "serverInfo",
+        assert_equal Zotero::MCP::VERSION, result.dig("result", "serverInfo",
             "version")
     end
 
     def test_tools_list_names_every_tool_with_an_object_schema
         tools = rpc("tools/list").dig("result", "tools")
         names = tools.map { |tool| tool["name"] }
-        assert_equal ZoteroMCP::TOOLS.map(&:name_value).sort, names.sort
+        assert_equal Zotero::MCP::TOOLS.map(&:name_value).sort, names.sort
         assert_equal 14, names.length
         tools.each do |tool|
             assert_equal "object", tool.dig("inputSchema", "type"), tool["name"]

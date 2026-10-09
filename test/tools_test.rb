@@ -4,7 +4,7 @@ require_relative "test_helper"
 
 # The MCP tool classes: their `.call` methods build the right client calls,
 # surface guard errors as text, and short-circuit on invalid arguments. The
-# client is stubbed via ZoteroMCP's memoized instance.
+# client is stubbed via Zotero::MCP's memoized instance.
 class ToolsTest < Minitest::Test
     def test_search_items_returns_formatted_summary
         client = stub_client do |req|
@@ -13,7 +13,7 @@ class ToolsTest < Minitest::Test
                 "title" => "Dune" } }], headers: { "Total-Results" => "1" })
         end
         response = with_client(client) do
-            ZoteroMCP::SearchItems.call(query: "dune")
+            Zotero::MCP::SearchItems.call(query: "dune")
         end
         payload = text_of(response)
         assert_equal 1, payload["pagination"]["total"]
@@ -29,7 +29,7 @@ class ToolsTest < Minitest::Test
             end
         end
         response = with_client(client) do
-            ZoteroMCP::GetItem.call(item_key: "ITEM0001", include_children: true)
+            Zotero::MCP::GetItem.call(item_key: "ITEM0001", include_children: true)
         end
         payload = text_of(response)
         assert_equal "ITEM0001", payload["item"]["key"]
@@ -39,7 +39,7 @@ class ToolsTest < Minitest::Test
     def test_get_item_surfaces_not_found_as_error_text
         client = stub_client { |_req| resp(code: "404") }
         response = with_client(client) do
-            ZoteroMCP::GetItem.call(item_key: "MISSING1")
+            Zotero::MCP::GetItem.call(item_key: "MISSING1")
         end
         assert_match(/Not found/, text_of(response)["error"])
     end
@@ -56,7 +56,7 @@ class ToolsTest < Minitest::Test
             end
         end
         response = with_client(client) do
-            ZoteroMCP::CreateItem.call(
+            Zotero::MCP::CreateItem.call(
                 item_type: "journalArticle",
                 fields: { "title" => "A Study" },
                 creators: [{ "creatorType" => "author", "lastName" => "Ada" }],
@@ -83,7 +83,7 @@ class ToolsTest < Minitest::Test
             end
         end
         with_client(client) do
-            ZoteroMCP::CreateNote.call(note_html: "<p>hi</p>",
+            Zotero::MCP::CreateNote.call(note_html: "<p>hi</p>",
                 parent_item_key: "PARENT01")
         end
         assert_equal "<p>hi</p>", captured["note"]
@@ -95,7 +95,7 @@ class ToolsTest < Minitest::Test
     def test_create_note_rejects_parent_item_key_with_collection_keys
         client = stub_client { |_req| flunk "no request should be sent" }
         response = with_client(client) do
-            ZoteroMCP::CreateNote.call(note_html: "<p>hi</p>",
+            Zotero::MCP::CreateNote.call(note_html: "<p>hi</p>",
                 parent_item_key: "PARENT01", collection_keys: ["COL1"])
         end
         assert response.error?
@@ -115,7 +115,7 @@ class ToolsTest < Minitest::Test
             end
         end
         response = with_client(client) do
-            ZoteroMCP::CreateNote.call(note_html: "<p>hi</p>",
+            Zotero::MCP::CreateNote.call(note_html: "<p>hi</p>",
                 parent_item_key: "PARENT01", collection_keys: [])
         end
         refute response.error?
@@ -125,24 +125,24 @@ class ToolsTest < Minitest::Test
 
     def test_update_item_requires_some_change
         response = with_client(stub_client) do
-            ZoteroMCP::UpdateItem.call(item_key: "ITEM0001")
+            Zotero::MCP::UpdateItem.call(item_key: "ITEM0001")
         end
         assert_match(/Provide fields, tags, or collection_keys/,
             text_of(response)["error"])
     end
 
     def test_delete_item_rejects_empty_and_oversized_batches
-        empty = with_client(stub_client) { ZoteroMCP::DeleteItem.call(item_keys: []) }
+        empty = with_client(stub_client) { Zotero::MCP::DeleteItem.call(item_keys: []) }
         assert_match(/at least one/i, text_of(empty)["error"])
 
-        big_keys = Array.new(ZoteroMCP::MAX_WRITE_BATCH + 1, "K")
-        big = with_client(stub_client) { ZoteroMCP::DeleteItem.call(item_keys: big_keys) }
+        big_keys = Array.new(Zotero::MCP::MAX_WRITE_BATCH + 1, "K")
+        big = with_client(stub_client) { Zotero::MCP::DeleteItem.call(item_keys: big_keys) }
         assert_match(/at most/i, text_of(big)["error"])
     end
 
     def test_generate_bibliography_requires_input
         response = with_client(stub_client) do
-            ZoteroMCP::GenerateBibliography.call
+            Zotero::MCP::GenerateBibliography.call
         end
         assert_match(/Provide item_keys or collection_key/,
             text_of(response)["error"])
@@ -151,7 +151,7 @@ class ToolsTest < Minitest::Test
     def test_generate_bibliography_returns_entries
         client = stub_client { |_req| resp(body: [{ "bib" => "Ref 1" }]) }
         response = with_client(client) do
-            ZoteroMCP::GenerateBibliography.call(item_keys: ["AAAA1111"], style: "ieee")
+            Zotero::MCP::GenerateBibliography.call(item_keys: ["AAAA1111"], style: "ieee")
         end
         payload = text_of(response)
         assert_equal "ieee", payload["style"]
@@ -163,7 +163,7 @@ class ToolsTest < Minitest::Test
             assert_equal "/itemTypes", req[:path]
             resp(body: [{ "itemType" => "book", "localized" => "Book" }])
         end
-        response = with_client(client) { ZoteroMCP::GetItemTemplate.call }
+        response = with_client(client) { Zotero::MCP::GetItemTemplate.call }
         assert_equal "book", text_of(response)["itemTypes"].first["itemType"]
     end
 
@@ -172,7 +172,7 @@ class ToolsTest < Minitest::Test
             resp(body: [{ "key" => "COL1", "data" => { "name" => "Papers" },
                 "meta" => { "numItems" => 4 } }], headers: { "Total-Results" => "1" })
         end
-        response = with_client(client) { ZoteroMCP::ListCollections.call }
+        response = with_client(client) { Zotero::MCP::ListCollections.call }
         collection = text_of(response)["collections"].first
         assert_equal "COL1", collection["key"]
         assert_equal "Papers", collection["name"]
@@ -185,15 +185,15 @@ class ToolsTest < Minitest::Test
 
     def test_update_item_without_changes_flags_error
         response = with_client(stub_client) do
-            ZoteroMCP::UpdateItem.call(item_key: "ITEM0001")
+            Zotero::MCP::UpdateItem.call(item_key: "ITEM0001")
         end
         assert response.error?
     end
 
     def test_delete_item_rejects_oversized_batch_flags_error
-        big_keys = Array.new(ZoteroMCP::MAX_WRITE_BATCH + 1, "K")
+        big_keys = Array.new(Zotero::MCP::MAX_WRITE_BATCH + 1, "K")
         response = with_client(stub_client) do
-            ZoteroMCP::DeleteItem.call(item_keys: big_keys)
+            Zotero::MCP::DeleteItem.call(item_keys: big_keys)
         end
         assert response.error?
     end
@@ -203,19 +203,19 @@ class ToolsTest < Minitest::Test
     # ------------------------------------------------------------------ #
 
     def test_search_items_schema_declares_enums
-        properties = ZoteroMCP::SearchItems.input_schema.to_h[:properties]
+        properties = Zotero::MCP::SearchItems.input_schema.to_h[:properties]
         assert_equal %w[titleCreatorYear everything], properties[:qmode][:enum]
         assert_equal %w[asc desc], properties[:direction][:enum]
         assert_equal %w[summary json], properties[:response_format][:enum]
     end
 
     def test_get_collection_items_schema_declares_response_format_enum
-        properties = ZoteroMCP::GetCollectionItems.input_schema.to_h[:properties]
+        properties = Zotero::MCP::GetCollectionItems.input_schema.to_h[:properties]
         assert_equal %w[summary json], properties[:response_format][:enum]
     end
 
     def test_generate_bibliography_schema_declares_mode_enum
-        properties = ZoteroMCP::GenerateBibliography.input_schema.to_h[:properties]
+        properties = Zotero::MCP::GenerateBibliography.input_schema.to_h[:properties]
         assert_equal %w[bibliography citation], properties[:mode][:enum]
     end
 
@@ -226,8 +226,8 @@ class ToolsTest < Minitest::Test
     def test_generate_bibliography_rejects_too_many_item_keys
         client = stub_client { |_req| flunk "no request should be sent" }
         response = with_client(client) do
-            ZoteroMCP::GenerateBibliography.call(
-                item_keys: Array.new(ZoteroMCP::MAX_WRITE_BATCH + 1, "AAAA1111"),
+            Zotero::MCP::GenerateBibliography.call(
+                item_keys: Array.new(Zotero::MCP::MAX_WRITE_BATCH + 1, "AAAA1111"),
             )
         end
         assert response.error?
@@ -240,7 +240,7 @@ class ToolsTest < Minitest::Test
             resp(body: [{ "bib" => "Ref 1" }], headers: { "Total-Results" => "5" })
         end
         response = with_client(client) do
-            ZoteroMCP::GenerateBibliography.call(item_keys: ["AAAA1111"])
+            Zotero::MCP::GenerateBibliography.call(item_keys: ["AAAA1111"])
         end
         payload = text_of(response)
         assert_equal 5, payload["total"]
@@ -257,7 +257,7 @@ class ToolsTest < Minitest::Test
                 "totalPages" => 1 })
         end
         response = with_client(client) do
-            ZoteroMCP::GetItemFulltext.call(item_key: "ATT00001", offset: 3, max_chars: 4)
+            Zotero::MCP::GetItemFulltext.call(item_key: "ATT00001", offset: 3, max_chars: 4)
         end
         payload = text_of(response)
         assert_equal "ATT00001", payload["item_key"]
@@ -273,7 +273,7 @@ class ToolsTest < Minitest::Test
     def test_get_item_fulltext_omits_next_offset_when_exhausted
         client = stub_client { |_req| resp(body: { "content" => "hello" }) }
         response = with_client(client) do
-            ZoteroMCP::GetItemFulltext.call(item_key: "ATT00001")
+            Zotero::MCP::GetItemFulltext.call(item_key: "ATT00001")
         end
         payload = text_of(response)
         refute payload.key?("next_offset")
@@ -301,7 +301,7 @@ class ToolsTest < Minitest::Test
             end
         end
         response = with_client(client) do
-            ZoteroMCP::GetItemFulltext.call(item_key: "PARENT1")
+            Zotero::MCP::GetItemFulltext.call(item_key: "PARENT1")
         end
         payload = text_of(response)
         assert_equal "ATTPDF01", payload["item_key"]
@@ -322,7 +322,7 @@ class ToolsTest < Minitest::Test
             end
         end
         response = with_client(client) do
-            ZoteroMCP::GetItemFulltext.call(item_key: "PARENT1")
+            Zotero::MCP::GetItemFulltext.call(item_key: "PARENT1")
         end
         assert response.error?
         assert_match(/No indexed full text/, text_of(response)["error"])
@@ -331,7 +331,7 @@ class ToolsTest < Minitest::Test
     def test_get_item_fulltext_reraises_original_when_children_also_missing
         client = stub_client { |_req| resp(code: "404", body: "original") }
         response = with_client(client) do
-            ZoteroMCP::GetItemFulltext.call(item_key: "PARENT1")
+            Zotero::MCP::GetItemFulltext.call(item_key: "PARENT1")
         end
         assert response.error?
         assert_match(/Not found/, text_of(response)["error"])
@@ -346,7 +346,7 @@ class ToolsTest < Minitest::Test
             end
         end
         response = with_client(client) do
-            ZoteroMCP::GetItemFulltext.call(item_key: "ATT00001")
+            Zotero::MCP::GetItemFulltext.call(item_key: "ATT00001")
         end
         assert response.error?
         message = text_of(response)["error"]
@@ -363,7 +363,7 @@ class ToolsTest < Minitest::Test
             end
         end
         response = with_client(client) do
-            ZoteroMCP::GetItemFulltext.call(item_key: "ATT00001")
+            Zotero::MCP::GetItemFulltext.call(item_key: "ATT00001")
         end
         assert response.error?
         assert_equal "No indexed full text for this item or its attachments.",
@@ -383,7 +383,7 @@ class ToolsTest < Minitest::Test
             resp(body: items, headers: { "Total-Results" => "130" })
         end
         response = with_client(client) do
-            ZoteroMCP::GenerateBibliography.call(collection_key: "COL1")
+            Zotero::MCP::GenerateBibliography.call(collection_key: "COL1")
         end
         payload = text_of(response)
         assert_equal ["0"], starts
@@ -401,7 +401,7 @@ class ToolsTest < Minitest::Test
                 headers: { "Total-Results" => "130" })
         end
         response = with_client(client) do
-            ZoteroMCP::GenerateBibliography.call(collection_key: "COL1",
+            Zotero::MCP::GenerateBibliography.call(collection_key: "COL1",
                 start: 100)
         end
         payload = text_of(response)
@@ -417,7 +417,7 @@ class ToolsTest < Minitest::Test
             resp(body: { "success" => { "0" => "COLNEW01" }, "failed" => {} })
         end
         with_client(client) do
-            ZoteroMCP::CreateCollection.call(name: "New", parent_collection_key: "PARENT01")
+            Zotero::MCP::CreateCollection.call(name: "New", parent_collection_key: "PARENT01")
         end
         assert_equal "New", captured["name"]
         assert_equal "PARENT01", captured["parentCollection"]

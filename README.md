@@ -41,7 +41,7 @@ the standard library.
 Either run it from a checkout:
 
 ```bash
-cd mcp-zotero
+cd zotero-mcp
 bundle install
 ```
 
@@ -49,8 +49,8 @@ or build and install the gem, which puts a `zotero-mcp` command on your
 `PATH` and pulls in the `mcp` gem:
 
 ```bash
-gem build zotero_mcp.gemspec
-gem install ./zotero_mcp-*.gem
+gem build zotero-mcp.gemspec
+gem install ./zotero-mcp-*.gem
 ```
 
 ### 2. Get a Zotero API key and library id
@@ -75,7 +75,7 @@ claude mcp add zotero --scope user \
   --env ZOTERO_API_KEY=your-zotero-api-key \
   --env ZOTERO_LIBRARY_ID=1234567 \
   --env ZOTERO_LIBRARY_TYPE=user \
-  -- ruby /absolute/path/to/mcp-zotero/zotero_mcp_server.rb
+  -- ruby /absolute/path/to/zotero-mcp/zotero_mcp_server.rb
 ```
 
 With the gem installed, register its command instead (absolute path from
@@ -94,8 +94,8 @@ run the script through Bundler instead:
 claude mcp add zotero --scope user \
   --env ZOTERO_API_KEY=your-zotero-api-key \
   --env ZOTERO_LIBRARY_ID=1234567 \
-  --env BUNDLE_GEMFILE=/absolute/path/to/mcp-zotero/Gemfile \
-  -- bundle exec ruby /absolute/path/to/mcp-zotero/zotero_mcp_server.rb
+  --env BUNDLE_GEMFILE=/absolute/path/to/zotero-mcp/Gemfile \
+  -- bundle exec ruby /absolute/path/to/zotero-mcp/zotero_mcp_server.rb
 ```
 
 Then check it connected:

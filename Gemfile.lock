@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    zotero_mcp (1.1.0)
+    zotero-mcp (1.2.0)
       mcp (~> 0.22)
 
 GEM
@@ -24,7 +24,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  zotero_mcp!
+  zotero-mcp!
 
 CHECKSUMS
   bigdecimal (4.1.2) sha256=53d217666027eab4280346fba98e7d5b66baaae1b9c3c1c0ffe89d48188a3fbd
@@ -34,7 +34,7 @@ CHECKSUMS
   mcp (0.22.0) sha256=e2ef603207c7e2c691bef4d8d8ab35d9740bedf315949fdb6d9a25318d1a7025
   regexp_parser (2.12.0) sha256=35a916a1d63190ab5c9009457136ae5f3c0c7512d60291d0d1378ba18ce08ebb
   simpleidn (0.2.3) sha256=08ce96f03fa1605286be22651ba0fc9c0b2d6272c9b27a260bc88be05b0d2c29
-  zotero_mcp (1.1.0)
+  zotero-mcp (1.2.0)
 
 BUNDLED WITH
   4.0.14

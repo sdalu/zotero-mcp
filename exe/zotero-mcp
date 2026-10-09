@@ -3,6 +3,6 @@
 
 # Zotero MCP server over stdio; configuration comes from the environment
 # (see README.md).
-require_relative "../lib/zotero_mcp"
+require_relative "../lib/zotero/mcp"
 
-ZoteroMCP.run
+Zotero::MCP.run

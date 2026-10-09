@@ -15,9 +15,9 @@ end
 
 require "minitest/autorun"
 
-# Loading the server defines everything under ZoteroMCP without starting the
+# Loading the server defines everything under Zotero::MCP without starting the
 # stdio transport (that only runs when the file is the program entry point).
-require_relative "../lib/zotero_mcp"
+require_relative "../lib/zotero/mcp"
 
 module TestSupport
     DEFAULT_CONFIG = {
@@ -26,20 +26,20 @@ module TestSupport
     }.freeze
 
     def build_config(**overrides)
-        ZoteroMCP::Config.new(**DEFAULT_CONFIG.merge(overrides))
+        Zotero::MCP::Config.new(**DEFAULT_CONFIG.merge(overrides))
     end
 
     # Build a FakeResponse the way the real Client sees it: a string body and
     # string-keyed headers. A non-string body is JSON-encoded for convenience.
     def resp(code: "200", body: "", headers: {})
         body = JSON.dump(body) unless body.is_a?(String)
-        ZoteroMCP::FakeResponse.new(code: code.to_s, body: body, headers: headers)
+        Zotero::MCP::FakeResponse.new(code: code.to_s, body: body, headers: headers)
     end
 
     # A Client subclass that records outgoing requests and returns canned
     # responses from the given block instead of touching the network. Overrides
     # `sleep` so retry tests never actually wait.
-    class StubClient < ZoteroMCP::Client
+    class StubClient < Zotero::MCP::Client
         attr_reader :requests, :sleeps
 
         def initialize(config, &responder)
@@ -76,14 +76,14 @@ module TestSupport
         JSON.parse(response.content.first[:text])
     end
 
-    # Temporarily install a stub as ZoteroMCP's memoized client so tool
+    # Temporarily install a stub as Zotero::MCP's memoized client so tool
     # `.call` methods can be exercised, then restore the lazy default.
     def with_client(client)
-        previous = ZoteroMCP.instance_variable_get(:@client)
-        ZoteroMCP.instance_variable_set(:@client, client)
+        previous = Zotero::MCP.instance_variable_get(:@client)
+        Zotero::MCP.instance_variable_set(:@client, client)
         yield
     ensure
-        ZoteroMCP.instance_variable_set(:@client, previous)
+        Zotero::MCP.instance_variable_set(:@client, previous)
     end
 
     # Run a block with a patched ENV, restoring the originals afterwards.
