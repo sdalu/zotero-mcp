@@ -16,7 +16,7 @@ Gem::Specification.new do |spec|
     DESC
     spec.homepage = "https://github.com/sdalu/zotero-mcp"
     spec.license = "MIT"
-    spec.required_ruby_version = ">= 3.2"
+    spec.required_ruby_version = ">= 3.3"
 
     spec.files = Dir["lib/**/*.rb", "exe/*", "README.md", "DESIGN.md",
                      "LICENSE"]

@@ -1,7 +1,7 @@
 # Copied from the house Ruby style guide's rubocop.yml (the ruby skill,
 # scripts/rubocop.yml); keep in step with it. Project changes, both in
 # AllCops: TargetRubyVersion follows the gemspec's required_ruby_version
-# (3.2), not the guide's 3.4; and vendors/ (Bundler's install path here)
+# (3.3), not the guide's 3.4; and vendors/ (Bundler's install path here)
 # is excluded, since gems installed there carry their own .rubocop.yml;
 # SuggestExtensions is off, so the run ends on its verdict. The Exclude
 # list is merged with RuboCop's defaults (which skip vendor/, where CI
@@ -40,7 +40,7 @@ inherit_mode:
     - Exclude
 
 AllCops:
-  TargetRubyVersion: 3.2
+  TargetRubyVersion: 3.3
   NewCops: enable
   SuggestExtensions: false
   Exclude:

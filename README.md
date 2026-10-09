@@ -30,7 +30,7 @@ the standard library.
 
 ## Requirements
 
-- Ruby 3.4 or newer (recommended; the code also runs on 3.2+).
+- Ruby 3.3 or newer.
 - [Bundler](https://bundler.io) to install the `mcp` gem.
 - A Zotero account and a library to connect to.
 
@@ -151,7 +151,7 @@ bundle exec ruby test/retry_test.rb   # a single file
 bundle exec rubocop             # the house style, from .rubocop.yml
 ```
 
-CI (`.github/workflows/ci.yml`) runs the suite on Ruby 3.2, 3.3 and 3.4, plus
+CI (`.github/workflows/ci.yml`) runs the suite on Ruby 3.3 and 3.4, plus
 RuboCop and a gem build, on every push to `main` and every pull request.
 
 ## Notes and safety
@@ -167,7 +167,7 @@ RuboCop and a gem build, on every push to `main` and every pull request.
 ## Troubleshooting
 
 - **Server won't connect / not listed** — use absolute paths for `ruby` and the
-  script; confirm `ruby -v` is 3.2+; run the `claude mcp add` command again.
+  script; confirm `ruby -v` is 3.3+; run the `claude mcp add` command again.
 - **"Permission denied (403)"** — the key is missing, invalid, or lacks the
   needed access; write tools require a write-enabled key.
 - **"Version conflict (412)"** — the item changed on the server; re-fetch it

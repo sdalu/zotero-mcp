@@ -15,8 +15,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The gemspec's required_ruby_version is >= 3.2.
-        ruby: ["3.2", "3.3", "3.4"]
+        # The gemspec's required_ruby_version is >= 3.3 (Debian stable's
+        # Ruby); 3.4 is what the house style targets.
+        ruby: ["3.3", "3.4"]
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
