@@ -19,7 +19,7 @@ the standard library.
 | `zotero_get_collection_items` | List items inside a collection | no |
 | `zotero_list_tags` | List tags, optionally filtered | no |
 | `zotero_get_item_fulltext` | Indexed full text of an attachment (e.g. a PDF), or of its parent item — the attachment is resolved automatically (PDFs first); paged with `offset`/`max_chars` | no |
-| `zotero_generate_bibliography` | Formatted references in a CSL style (APA, IEEE, …) | no |
+| `zotero_generate_bibliography` | Formatted references in a CSL style (APA, IEEE, …), for up to 50 items or a whole collection; a collection comes 100 items at a time, continued with `start` | no |
 | `zotero_get_item_template` | List item types, or get a blank template + creator types | no |
 | `zotero_create_item` | Create an item from a type template | **yes** |
 | `zotero_create_note` | Create a standalone or child note | **yes** |

@@ -100,6 +100,17 @@ class ClientTest < Minitest::Test
         assert_equal "Service unavailable (503). Retry in 4 seconds.", error.message
     end
 
+    def test_service_unavailable_message_includes_body_suffix
+        client = stub_client
+        error = assert_raises(ZoteroMCP::RateLimitedError) do
+            client.send(:handle, resp(code: "503",
+                headers: { "Retry-After" => "4" }, body: "maintenance"))
+        end
+        assert_match(/\AService unavailable \(503\)\. Retry in 4 seconds\./,
+            error.message)
+        assert_match(/Server said: maintenance\z/, error.message)
+    end
+
     def test_service_unavailable_with_backoff_is_rate_limited
         client = stub_client
         error = assert_raises(ZoteroMCP::RateLimitedError) do

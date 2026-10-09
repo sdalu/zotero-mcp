@@ -104,6 +104,25 @@ class ToolsTest < Minitest::Test
         assert_empty client.requests
     end
 
+    def test_create_note_as_child_accepts_empty_collection_keys
+        captured = nil
+        client = stub_client do |req|
+            if req[:method] == :get
+                resp(body: { "itemType" => "note", "note" => "" })
+            else
+                captured = JSON.parse(req[:body]).first
+                resp(body: { "success" => { "0" => "NOTE0001" }, "failed" => {} })
+            end
+        end
+        response = with_client(client) do
+            ZoteroMCP::CreateNote.call(note_html: "<p>hi</p>",
+                parent_item_key: "PARENT01", collection_keys: [])
+        end
+        refute response.error?
+        assert_equal "PARENT01", captured["parentItem"]
+        refute captured.key?("collections")
+    end
+
     def test_update_item_requires_some_change
         response = with_client(stub_client) do
             ZoteroMCP::UpdateItem.call(item_key: "ITEM0001")
@@ -316,6 +335,79 @@ class ToolsTest < Minitest::Test
         end
         assert response.error?
         assert_match(/Not found/, text_of(response)["error"])
+    end
+
+    def test_get_item_fulltext_keeps_original_404_when_key_is_not_a_parent
+        client = stub_client do |req|
+            if req[:path].end_with?("/children")
+                resp(code: "400", body: "not a parent item")
+            else
+                resp(code: "404", body: "no indexed text")
+            end
+        end
+        response = with_client(client) do
+            ZoteroMCP::GetItemFulltext.call(item_key: "ATT00001")
+        end
+        assert response.error?
+        message = text_of(response)["error"]
+        assert_match(/Server said: no indexed text\z/, message)
+        refute_match(/not a parent item/, message)
+    end
+
+    def test_get_item_fulltext_on_childless_key_says_no_text
+        client = stub_client do |req|
+            if req[:path].end_with?("/children")
+                resp(body: [])
+            else
+                resp(code: "404")
+            end
+        end
+        response = with_client(client) do
+            ZoteroMCP::GetItemFulltext.call(item_key: "ATT00001")
+        end
+        assert response.error?
+        assert_equal "No indexed full text for this item or its attachments.",
+            text_of(response)["error"]
+    end
+
+    # ------------------------------------------------------------------ #
+    # Bibliography paging
+    # ------------------------------------------------------------------ #
+
+    def test_generate_bibliography_pages_a_collection
+        starts = []
+        client = stub_client do |req|
+            starts << req[:params]["start"]
+            # 100 items on the first page, one of them (a note) with no bib.
+            items = Array.new(99) { |i| { "bib" => "Ref #{i}" } } + [{}]
+            resp(body: items, headers: { "Total-Results" => "130" })
+        end
+        response = with_client(client) do
+            ZoteroMCP::GenerateBibliography.call(collection_key: "COL1")
+        end
+        payload = text_of(response)
+        assert_equal ["0"], starts
+        assert_equal 99, payload["entries"].length
+        assert_equal 130, payload["total"]
+        assert payload["truncated"]
+        assert_equal 100, payload["next_start"]
+    end
+
+    def test_generate_bibliography_last_page_has_no_next_start
+        starts = []
+        client = stub_client do |req|
+            starts << req[:params]["start"]
+            resp(body: Array.new(30) { |i| { "bib" => "Ref #{i}" } },
+                headers: { "Total-Results" => "130" })
+        end
+        response = with_client(client) do
+            ZoteroMCP::GenerateBibliography.call(collection_key: "COL1",
+                start: 100)
+        end
+        payload = text_of(response)
+        assert_equal ["100"], starts
+        refute payload.key?("truncated")
+        refute payload.key?("next_start")
     end
 
     def test_create_collection_nests_under_parent

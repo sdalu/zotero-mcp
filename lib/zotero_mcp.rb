@@ -198,14 +198,18 @@ module ZoteroMCP
             get_json("/itemTypeCreatorTypes", itemType: item_type)
         end
 
-        def bibliography(item_keys:, collection_key:, style:, mode:)
+        def bibliography(item_keys:, collection_key:, style:, mode:,
+            start: 0)
             include = mode == "citation" ? "citation" : "bib"
-            params = { include: include, style: style, limit: MAX_LIMIT }
+            start = ZoteroMCP.clamp_start(start)
+            params = { include: include, style: style, limit: MAX_LIMIT,
+                       start: start }
             response = fetch_bib_response(item_keys, collection_key, params)
             body = parse_json(response.body)
             {
                 entries: body.map { |entry| entry[include] }.compact,
                 total: response["Total-Results"]&.to_i,
+                start: start, returned: body.length,
             }
         end
 
@@ -448,7 +452,8 @@ module ZoteroMCP
 
             seconds = header.to_i
             raise RateLimitedError.new(
-                "Service unavailable (503). Retry in #{seconds} seconds.",
+                "Service unavailable (503). Retry in #{seconds} " \
+                    "seconds.#{body_suffix(response)}",
                 retry_after: seconds,
             )
         end
@@ -635,7 +640,9 @@ module ZoteroMCP
     rescue NotFoundError => original
         begin
             kids = client.children(item_key)
-        rescue NotFoundError
+        rescue NotFoundError, APIError
+            # Not a parent item (Zotero refuses /children on an
+            # attachment or a note): the original 404 is the answer.
             raise original
         end
         fulltext_from_children(client, item_key, kids) ||
@@ -948,7 +955,9 @@ module ZoteroMCP
         description <<~DESC
             Produce formatted references for items using a CSL citation style.
             Give either item_keys or collection_key. Returns JSON with an
-            `entries` list of HTML-formatted strings.
+            `entries` list of HTML-formatted strings. A collection is formatted
+            100 items at a time: when more remain, the result has
+            `truncated: true` and a `next_start` to pass back as `start`.
         DESC
         input_schema(
             properties: {
@@ -961,6 +970,8 @@ module ZoteroMCP
                         "'chicago-note-bibliography', etc. (default 'apa')." },
                 mode: { type: "string", enum: %w[bibliography citation],
                     description: "'bibliography' (default) or 'citation'." },
+                start: { type: "integer",
+                    description: "Offset into the collection (default 0)." },
             },
             required: [],
         )
@@ -969,7 +980,7 @@ module ZoteroMCP
             open_world_hint: true)
 
         def self.call(item_keys: nil, collection_key: nil, style: "apa",
-            mode: "bibliography", server_context: nil)
+            mode: "bibliography", start: 0, server_context: nil)
             ZoteroMCP.guard do
                 keys = Array(item_keys)
                 if keys.empty? && collection_key.nil?
@@ -982,7 +993,7 @@ module ZoteroMCP
                 end
                 result = ZoteroMCP.client.bibliography(
                     item_keys: keys, collection_key: collection_key,
-                    style: style, mode: mode,
+                    style: style, mode: mode, start: start,
                 )
                 ZoteroMCP.text(bibliography_payload(style, mode, result))
             end
@@ -991,9 +1002,13 @@ module ZoteroMCP
         def self.bibliography_payload(style, mode, result)
             payload = { style: style, mode: mode, entries: result[:entries] }
             total = result[:total]
-            if total
-                payload[:total] = total
-                payload[:truncated] = true if total > result[:entries].length
+            return payload unless total
+
+            payload[:total] = total
+            next_start = result[:start] + result[:returned]
+            if next_start < total
+                payload[:truncated] = true
+                payload[:next_start] = next_start
             end
             payload
         end
@@ -1108,7 +1123,7 @@ module ZoteroMCP
         def self.call(note_html:, parent_item_key: nil, tags: nil,
             collection_keys: nil, server_context: nil)
             ZoteroMCP.guard do
-                if parent_item_key && collection_keys
+                if parent_item_key && Array(collection_keys).any?
                     next ZoteroMCP.error_text(
                         "collection_keys apply only to standalone notes; omit " \
                             "parent_item_key or collection_keys.",
