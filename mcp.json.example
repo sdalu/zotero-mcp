@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "zotero": {
+      "type": "stdio",
+      "command": "ruby",
+      "args": ["/absolute/path/to/zotero-mcp-ruby/zotero_mcp_server.rb"],
+      "env": {
+        "ZOTERO_API_KEY": "your-zotero-api-key",
+        "ZOTERO_LIBRARY_ID": "1234567",
+        "ZOTERO_LIBRARY_TYPE": "user"
+      }
+    }
+  }
+}

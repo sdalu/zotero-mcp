@@ -1,0 +1,6 @@
+# Live Zotero API key — never commit
+zotero-sdalu.txt
+
+# Installed gems (bundle install / gem install -i); reproducible from the Gemfile
+vendors/
+.bundle/
