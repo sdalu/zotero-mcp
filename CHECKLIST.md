@@ -39,8 +39,10 @@ Run in order, from the project directory.
 - [ ] Does `Zotero::MCP::VERSION` in `lib/zotero/mcp/version.rb` move? A
       changed tool, parameter or result shape is a minor bump, a fix is
       a patch. It is the only file the number is typed in; the gemspec
-      reads it, and the server reports it at `initialize`. Nothing is
-      tagged.
+      reads it, and the server reports it at `initialize`.
 - [ ] `bundle lock --local` -- if the number moved: Bundler copies it
       into `Gemfile.lock`, and `test/gemspec_test.rb` fails until it is
       refreshed.
+- [ ] `rake tag` -- if the number moved, once CI is green on the pushed
+      commit: tags HEAD `v<VERSION>` from the file (refuses a dirty tree
+      or an existing tag); then `git push origin v<VERSION>`.
