@@ -24,6 +24,6 @@ Gem::Specification.new do |spec|
     spec.executables = ["zotero-mcp"]
     spec.require_paths = ["lib"]
 
-    spec.add_dependency "mcp", "~> 0.22"
+    spec.add_dependency "mcp", "~> 1.7"
     spec.metadata["rubygems_mfa_required"] = "true"
 end
