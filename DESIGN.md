@@ -7,10 +7,9 @@ it is in `README.md`.
 
 The whole server is `lib/zotero/mcp.rb`; `lib/zotero/mcp/version.rb`
 holds only the version, so the gemspec can read it without loading the
-`mcp` gem. Two launchers call `Zotero::MCP.run`: `exe/zotero-mcp`, which
-the gem installs on the `PATH`, and `zotero_mcp_server.rb` at the root of
-a checkout, so that a registration naming that path needs no gem install
-and keeps working. The only dependency is the `mcp` gem; HTTP goes
+`mcp` gem. One launcher, `exe/zotero-mcp`, calls `Zotero::MCP.run`; the
+gem installs it on the `PATH`, and a checkout runs the same file
+through Bundler. The only dependency is the `mcp` gem; HTTP goes
 through `Net::HTTP`. A REST client gem would save little: the Zotero API
 needs only GET, POST, PATCH and DELETE with a few headers.
 

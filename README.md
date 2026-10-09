@@ -67,15 +67,18 @@ resolves your user id from the key automatically. For a **group** library, set
 
 ### 3. Register with Claude Code
 
-Use an **absolute path** to both `ruby` and the script (a relative path is the
-most common reason a server fails to connect). Run `which ruby` to find yours.
+Use **absolute paths** (a relative path is the most common reason a server
+fails to connect). The server is started by `exe/zotero-mcp`.
+
+From a checkout, run it through Bundler so the `mcp` gem is found (`which
+ruby` gives the Ruby to name):
 
 ```bash
 claude mcp add zotero --scope user \
   --env ZOTERO_API_KEY=your-zotero-api-key \
   --env ZOTERO_LIBRARY_ID=1234567 \
-  --env ZOTERO_LIBRARY_TYPE=user \
-  -- ruby /absolute/path/to/zotero-mcp/zotero_mcp_server.rb
+  --env BUNDLE_GEMFILE=/absolute/path/to/zotero-mcp/Gemfile \
+  -- /absolute/path/to/ruby -rbundler/setup /absolute/path/to/zotero-mcp/exe/zotero-mcp
 ```
 
 With the gem installed, register its command instead (absolute path from
@@ -85,17 +88,6 @@ With the gem installed, register its command instead (absolute path from
 claude mcp add zotero --scope user \
   --env ZOTERO_API_KEY=your-zotero-api-key \
   -- /absolute/path/to/zotero-mcp
-```
-
-If you installed the gem with Bundler and it is not on the default load path,
-run the script through Bundler instead:
-
-```bash
-claude mcp add zotero --scope user \
-  --env ZOTERO_API_KEY=your-zotero-api-key \
-  --env ZOTERO_LIBRARY_ID=1234567 \
-  --env BUNDLE_GEMFILE=/absolute/path/to/zotero-mcp/Gemfile \
-  -- bundle exec ruby /absolute/path/to/zotero-mcp/zotero_mcp_server.rb
 ```
 
 Then check it connected:

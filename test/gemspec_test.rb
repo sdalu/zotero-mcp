@@ -45,9 +45,12 @@ class GemspecTest < Minitest::Test
         assert_match(/\AMIT License$/, File.read(File.join(ROOT, "LICENSE")))
     end
 
-    def test_files_leave_out_tests_and_the_checkout_launcher
+    def test_files_leave_out_tests
         refute(spec.files.any? { |file| file.start_with?("test/") })
-        refute_includes spec.files, "zotero_mcp_server.rb"
+    end
+
+    def test_executable_is_executable
+        assert File.executable?(File.join(ROOT, "exe/zotero-mcp"))
     end
 
     def test_runtime_dependency_is_mcp_only

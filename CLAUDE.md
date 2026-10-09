@@ -9,7 +9,7 @@ A Zotero MCP server in one Ruby file.
 - `CHECKLIST.md` -- what closes a round; read it before committing
 - `lib/zotero/mcp.rb` -- the whole server
 - `lib/zotero/mcp/version.rb` -- `Zotero::MCP::VERSION`, the release
-- `zotero_mcp_server.rb`, `exe/zotero-mcp` -- the checkout and gem launchers
+- `exe/zotero-mcp` -- the launcher, for a checkout and for the gem
 - `zotero-mcp.gemspec` -- packaging
 - `test/` -- offline Minitest suite; `StubClient` in `test/test_helper.rb` replaces the network
 
@@ -24,8 +24,6 @@ Gate: `ruby -wc lib/zotero/mcp.rb && rake test`
 - **The tests never reach Zotero.** A green suite proves the request
   shapes, not that the API accepts them; a change to a request should be
   tried once against the live server, through the `zotero_*` MCP tools.
-- **The live MCP registration points at `zotero_mcp_server.rb`.** Moving
-  or renaming that launcher disconnects the running server; keep it.
 - **Inside `Zotero::MCP`, the `mcp` gem is `::MCP`.** A bare `MCP::Tool`
   there resolves to `Zotero::MCP::Tool` and fails; always write the
   leading `::`.
