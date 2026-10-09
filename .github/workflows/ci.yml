@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (Ruby ${{ matrix.ruby }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The gemspec's required_ruby_version is >= 3.2.
+        ruby: ["3.2", "3.3", "3.4"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: Load the library with warnings on
+        run: |
+          out=$(bundle exec ruby -w -Ilib \
+            -e 'require "zotero/mcp"; Zotero::MCP.build_server' 2>&1)
+          if [ -n "$out" ]; then echo "$out"; exit 1; fi
+      - name: Test suite
+        run: bundle exec rake test
+
+  lint:
+    name: RuboCop and gem build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - name: RuboCop
+        run: bundle exec rubocop
+      - name: Build the gem
+        run: gem build zotero-mcp.gemspec

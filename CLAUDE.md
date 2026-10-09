@@ -12,6 +12,7 @@ A Zotero MCP server in one Ruby file.
 - `lib/zotero/mcp/version.rb` -- `Zotero::MCP::VERSION`, the release
 - `exe/zotero-mcp` -- the launcher, for a checkout and for the gem
 - `zotero-mcp.gemspec` -- packaging
+- `.github/workflows/ci.yml` -- CI: suite on Ruby 3.2-3.4, RuboCop, gem build
 - `test/` -- offline Minitest suite; `StubClient` in `test/test_helper.rb` replaces the network
 
 ## Gate

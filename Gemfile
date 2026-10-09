@@ -4,3 +4,11 @@ source "https://rubygems.org"
 
 # Runtime dependencies (the mcp gem) are declared in zotero-mcp.gemspec.
 gemspec
+
+group :development, :test do
+    gem "minitest", "~> 5.25"
+    gem "rake", "~> 13.0"
+    # Patch releases only: a minor release adds cops, and .rubocop.yml
+    # enables new cops, so an unpinned upgrade could fail CI on its own.
+    gem "rubocop", "~> 1.90.0"
+end

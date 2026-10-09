@@ -21,6 +21,9 @@ Run in order, from the project directory.
       refuses)? Then a test feeds it that input and asserts the
       `isError` result.
 
+- [ ] `gh run list --branch main --limit 1` -- after the push, the CI run
+      for the pushed commit is `completed` / `success`.
+
 ## Documents
 
 - [ ] `README.md` -- does the Tools table still list every tool, with the

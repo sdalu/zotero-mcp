@@ -137,19 +137,22 @@ rather than silently clobbering. Passing `tags` or `collection_keys` to update
 
 ## Tests
 
-The suite is plain [Minitest](https://github.com/minitest/minitest) (Ruby
-stdlib) and never touches the network: a `StubClient` records outgoing requests
+The suite is plain [Minitest](https://github.com/minitest/minitest) and never
+touches the network: a `StubClient` records outgoing requests
 and returns canned responses, so the client, read/write endpoints, formatting,
 and tool `.call` methods are all exercised offline; `test/server_test.rb` also
 drives the assembled server through JSON-RPC (`initialize`, `tools/list`,
-`tools/call`). The suite needs the `mcp` gem: either installed for this Ruby,
-or under `vendors/ruby/<ABI>` (what `bundle install` produces when Bundler's
-`path` is set to `vendors`), which `test/test_helper.rb` puts on the gem path.
+`tools/call`). `bundle install` brings in the `mcp` gem and the development
+tools (Minitest, Rake, RuboCop, pinned in the `Gemfile`):
 
 ```bash
-rake test            # or: ruby test/all.rb
-ruby test/retry_test.rb    # a single file
+bundle exec rake test           # the whole suite (or: ruby test/all.rb)
+bundle exec ruby test/retry_test.rb   # a single file
+bundle exec rubocop             # the house style, from .rubocop.yml
 ```
+
+CI (`.github/workflows/ci.yml`) runs the suite on Ruby 3.2, 3.3 and 3.4, plus
+RuboCop and a gem build, on every push to `main` and every pull request.
 
 ## Notes and safety
 
