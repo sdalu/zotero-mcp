@@ -45,6 +45,15 @@ class WriteApiTest < Minitest::Test
         assert_equal "GONE0001", result[:failed].first[:key]
     end
 
+    # A DELETE removes an item from Zotero for good; the trash is the
+    # item's "deleted" property, set with a version-checked PATCH.
+    def test_delete_items_moves_to_trash_with_a_patch
+        client = stub_client { |req| delete_stub_response(req) }
+        client.delete_items(%w[OK000001])
+        assert_equal(%i[get patch], client.requests.map { |req| req[:method] })
+        assert_patch_version(client.requests.last, 4, "deleted" => 1)
+    end
+
     def test_add_to_collection_merges_without_duplicates
         client = stub_client do |req|
             req[:method] == :get ? existing_collection_item : resp(code: "204")

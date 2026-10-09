@@ -61,6 +61,12 @@ batch request. That costs one round trip per item, but each key's
 success or failure is reported separately: a batch that fails on one
 item would tell the caller nothing about the others.
 
+A delete moves the item to the trash: it sets the item's `deleted`
+property with the same version-checked PATCH. An HTTP DELETE removes the
+item from Zotero for good (it then appears in the library's `/deleted`
+log and nowhere else), so the server never sends one, and
+`zotero_delete_item` stays recoverable from Zotero's trash.
+
 ## Bounded retries
 
 A 429, or a 503 that says when to come back, is retried at most

@@ -8,6 +8,8 @@ module Zotero
                 Fetch the full data for a single item by its key. Returns the
                 complete item JSON. When include_children is true, an additional
                 `children` array with the item's notes and attachments is added.
+                Children in the trash are left out, although the item's
+                meta.numChildren counts them.
             DESC
 
             item_key_desc = "The 8-character item key, e.g. 'ABCD2345'."

@@ -17,8 +17,7 @@ module Zotero
         REQUEST_CLASSES = {
             get: Net::HTTP::Get,
             post: Net::HTTP::Post,
-            patch: Net::HTTP::Patch,
-            delete: Net::HTTP::Delete
+            patch: Net::HTTP::Patch
         }.freeze
 
         # ----------------------------------------------------------------- #

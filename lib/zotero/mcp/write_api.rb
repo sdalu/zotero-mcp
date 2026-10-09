@@ -43,10 +43,12 @@ module Zotero
 
             private
 
+            # Moves the item to the trash. A DELETE request would remove it
+            # from Zotero for good, past any recovery; the trash is the
+            # item's "deleted" property.
             def delete_one(key, deleted, failed)
                 current = item(key)
-                request(:delete, "#{prefix}/items/#{key}",
-                        headers: version_header(current.fetch("version")))
+                patch_item(key, current.fetch("version"), { deleted: 1 })
                 deleted << key
             rescue Error => e
                 failed << { key: key, reason: e.message }
