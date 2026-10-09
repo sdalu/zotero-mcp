@@ -5,6 +5,7 @@
 require "json"
 require "net/http"
 require "openssl"
+require "securerandom"
 require "uri"
 
 # 2. Third-party gems
@@ -38,6 +39,8 @@ module ZoteroMCP
         end
     end
 
+    VERSION = "1.1.0"
+
     DEFAULT_LIMIT = 25
     MAX_LIMIT = 100
     MAX_WRITE_BATCH = 50
@@ -46,7 +49,7 @@ module ZoteroMCP
     LOCAL_BASE = "http://localhost:23119/api"
     OPEN_TIMEOUT = 10   # seconds to establish a connection
     READ_TIMEOUT = 60   # seconds to wait for a response
-    MAX_RETRIES = 2     # extra attempts after a 429
+    MAX_RETRIES = 2     # extra attempts after a 429 or a 503
     MAX_BACKOFF = 15    # never sleep longer than this between retries
     KEY_PATTERN = /\A[A-Za-z0-9]{1,32}\z/
 
@@ -198,22 +201,28 @@ module ZoteroMCP
         def bibliography(item_keys:, collection_key:, style:, mode:)
             include = mode == "citation" ? "citation" : "bib"
             params = { include: include, style: style, limit: MAX_LIMIT }
-            body = fetch_bib_body(item_keys, collection_key, params)
-            body.map { |entry| entry[include] }.compact
+            response = fetch_bib_response(item_keys, collection_key, params)
+            body = parse_json(response.body)
+            {
+                entries: body.map { |entry| entry[include] }.compact,
+                total: response["Total-Results"]&.to_i,
+            }
         end
 
         private
 
-        def fetch_bib_body(item_keys, collection_key, params)
+        # /top so child notes and attachments contributed by a collection
+        # produce no bibliography entries of their own.
+        def fetch_bib_response(item_keys, collection_key, params)
             if collection_key
                 key = ZoteroMCP.validate_key!(collection_key)
-                path = "#{prefix}/collections/#{key}/items"
+                path = "#{prefix}/collections/#{key}/items/top"
             else
                 keys = item_keys.map { |key| ZoteroMCP.validate_key!(key) }
                 path = "#{prefix}/items"
                 params = params.merge(itemKey: keys.join(","))
             end
-            parse_json(request(:get, path, params: params).body)
+            request(:get, path, params: params)
         end
 
         def limit_params(limit, start)
@@ -295,8 +304,11 @@ module ZoteroMCP
         end
 
         def write_json(method, path, payload)
-            response = request(method, path,
-                body: JSON.dump(payload), headers: json_content)
+            headers = json_content
+            if method == :post
+                headers = headers.merge("Zotero-Write-Token" => SecureRandom.hex(16))
+            end
+            response = request(method, path, body: JSON.dump(payload), headers: headers)
             normalize_write(parse_json(response.body))
         end
 
@@ -406,11 +418,15 @@ module ZoteroMCP
             status = response.code.to_i
             case status
             in 200..299 then response
-            in 403 then raise NotAuthorisedError, forbidden_message
-            in 404 then raise NotFoundError, "Not found (404). Check the key."
-            in 412 then raise ConflictError, conflict_message
+            in 403 then raise NotAuthorisedError,
+                "#{forbidden_message}#{body_suffix(response)}"
+            in 404 then raise NotFoundError,
+                "Not found (404). Check the key.#{body_suffix(response)}"
+            in 412 then raise ConflictError,
+                "#{conflict_message}#{body_suffix(response)}"
             in 429 then raise_rate_limited(response)
-            else raise APIError, "Zotero API error #{status}."
+            in 503 then raise_service_unavailable(response)
+            else raise APIError, "Zotero API error #{status}.#{body_suffix(response)}"
             end
         end
 
@@ -418,7 +434,21 @@ module ZoteroMCP
             header = response["Retry-After"] || response["Backoff"]
             seconds = ZoteroMCP.presence(header)&.to_i
             raise RateLimitedError.new(
-                "Rate limited (429). Retry in #{seconds || "a few"} seconds.",
+                "Rate limited (429). Retry in #{seconds || "a few"} " \
+                    "seconds.#{body_suffix(response)}",
+                retry_after: seconds,
+            )
+        end
+
+        def raise_service_unavailable(response)
+            header = ZoteroMCP.presence(response["Retry-After"] || response["Backoff"])
+            unless header
+                raise APIError, "Zotero API error 503.#{body_suffix(response)}"
+            end
+
+            seconds = header.to_i
+            raise RateLimitedError.new(
+                "Service unavailable (503). Retry in #{seconds} seconds.",
                 retry_after: seconds,
             )
         end
@@ -431,6 +461,17 @@ module ZoteroMCP
         def conflict_message
             "Version conflict (412). The object changed on the server; " \
                 "re-fetch it and retry."
+        end
+
+        # Non-2xx responses often carry a plain-text explanation; surfacing it
+        # (bounded, so a huge body can't blow up an error message) helps
+        # diagnose failures that the generic status message cannot.
+        def body_suffix(response)
+            body = ZoteroMCP.presence(response.body)
+            return "" unless body
+
+            snippet = body.length > 500 ? "#{body[0, 500]}…" : body
+            " Server said: #{snippet}"
         end
 
         def resolve_library_id
@@ -488,12 +529,19 @@ module ZoteroMCP
         )
     end
 
+    def self.error_text(message)
+        MCP::Tool::Response.new(
+            [{ type: "text", text: JSON.pretty_generate(error: message) }],
+            error: true,
+        )
+    end
+
     def self.guard
         yield
     rescue Error => e
-        text(error: e.message)
+        error_text(e.message)
     rescue StandardError => e
-        text(error: "Unexpected #{e.class}: #{e.message}")
+        error_text("Unexpected #{e.class}: #{e.message}")
     end
 
     def self.format_page(page, response_format)
@@ -570,6 +618,76 @@ module ZoteroMCP
         "At most #{MAX_WRITE_BATCH} items per call."
     end
 
+    DEFAULT_MAX_CHARS = 20_000
+    MAX_MAX_CHARS = 200_000
+
+    def self.clamp_max_chars(max_chars)
+        return DEFAULT_MAX_CHARS unless max_chars.is_a?(Integer) && max_chars >= 1
+
+        max_chars.clamp(1, MAX_MAX_CHARS)
+    end
+
+    # Full text lives on the attachment, not its parent, but callers often
+    # only have the parent's key. Falling back to the children (PDFs first)
+    # means either key works for zotero_get_item_fulltext.
+    def self.fulltext_with_fallback(client, item_key)
+        { body: client.fulltext(item_key), item_key: item_key }
+    rescue NotFoundError => original
+        begin
+            kids = client.children(item_key)
+        rescue NotFoundError
+            raise original
+        end
+        fulltext_from_children(client, item_key, kids) ||
+            (raise NotFoundError,
+                "No indexed full text for this item or its attachments.")
+    end
+
+    def self.fulltext_from_children(client, parent_key, children)
+        candidate_attachments(children).each do |child|
+            key = child["key"]
+            begin
+                return { body: client.fulltext(key), item_key: key,
+                         parent_key: parent_key }
+            rescue NotFoundError
+                next
+            end
+        end
+        nil
+    end
+
+    def self.candidate_attachments(children)
+        attachments = children.select do |child|
+            child.dig("data", "itemType") == "attachment"
+        end
+        pdfs, others = attachments.partition do |child|
+            child.dig("data", "contentType") == "application/pdf"
+        end
+        pdfs + others
+    end
+
+    def self.paginate_fulltext(resolved, offset, max_chars)
+        content = resolved[:body]["content"].to_s
+        start = clamp_start(offset)
+        size = clamp_max_chars(max_chars)
+        slice = content[start, size] || ""
+        result = {
+            item_key: resolved[:item_key], content: slice, offset: start,
+            returned_chars: slice.length, total_chars: content.length,
+        }
+        result[:parent_key] = resolved[:parent_key] if resolved[:parent_key]
+        next_offset = start + slice.length
+        result[:next_offset] = next_offset if next_offset < content.length
+        copy_fulltext_meta(result, resolved[:body])
+    end
+
+    def self.copy_fulltext_meta(result, body)
+        %w[indexedPages totalPages indexedChars totalChars].each do |field|
+            result[field.to_sym] = body[field] if body.key?(field)
+        end
+        result
+    end
+
     # ----------------------------------------------------------------- #
     # Tools
     # ----------------------------------------------------------------- #
@@ -587,7 +705,7 @@ module ZoteroMCP
             properties: {
                 query: { type: "string",
                     description: "Free-text search; omit to browse all." },
-                qmode: { type: "string",
+                qmode: { type: "string", enum: %w[titleCreatorYear everything],
                     description: "'titleCreatorYear' (default) or " \
                         "'everything' (also searches attachment full text)." },
                 item_type: { type: "string",
@@ -599,13 +717,13 @@ module ZoteroMCP
                     description: "Only top-level items (default true)." },
                 sort: { type: "string",
                     description: "Sort field, e.g. 'dateModified', 'title'." },
-                direction: { type: "string",
+                direction: { type: "string", enum: %w[asc desc],
                     description: "'asc' or 'desc'." },
                 limit: { type: "integer",
                     description: "Max items, 1-100 (default 25)." },
                 start: { type: "integer",
                     description: "Offset for pagination (default 0)." },
-                response_format: { type: "string",
+                response_format: { type: "string", enum: %w[summary json],
                     description: "'summary' (default) or 'json' for raw data." },
             },
             required: [],
@@ -729,7 +847,7 @@ module ZoteroMCP
                     description: "Max items, 1-100 (default 25)." },
                 start: { type: "integer",
                     description: "Offset for pagination (default 0)." },
-                response_format: { type: "string",
+                response_format: { type: "string", enum: %w[summary json],
                     description: "'summary' (default) or 'json'." },
             },
             required: ["collection_key"],
@@ -790,12 +908,21 @@ module ZoteroMCP
         tool_name "zotero_get_item_fulltext"
         description <<~DESC
             Return the indexed full-text content of an attachment item (e.g. a
-            stored PDF). The key must belong to the attachment, not its parent.
+            stored PDF). Either the attachment's own key or its parent item's
+            key is accepted; given a parent key, the attachment (PDFs first)
+            is resolved automatically. The content is paged: use offset and
+            max_chars, and next_offset in the result, to read more.
         DESC
         input_schema(
             properties: {
                 item_key: { type: "string",
-                    description: "Key of an attachment with indexed text." },
+                    description: "Key of an attachment with indexed text, " \
+                        "or of its parent item." },
+                offset: { type: "integer",
+                    description: "Character offset to start from (default 0)." },
+                max_chars: { type: "integer",
+                    description: "Max characters to return, 1-200000 " \
+                        "(default 20000)." },
             },
             required: ["item_key"],
         )
@@ -803,9 +930,15 @@ module ZoteroMCP
             destructive_hint: false, idempotent_hint: true,
             open_world_hint: true)
 
-        def self.call(item_key:, server_context: nil)
+        def self.call(item_key:, offset: 0, max_chars: ZoteroMCP::DEFAULT_MAX_CHARS,
+            server_context: nil)
             ZoteroMCP.guard do
-                ZoteroMCP.text(ZoteroMCP.client.fulltext(item_key))
+                resolved = ZoteroMCP.fulltext_with_fallback(
+                    ZoteroMCP.client, item_key,
+                )
+                ZoteroMCP.text(
+                    ZoteroMCP.paginate_fulltext(resolved, offset, max_chars),
+                )
             end
         end
     end
@@ -826,7 +959,7 @@ module ZoteroMCP
                 style: { type: "string",
                     description: "CSL style: 'apa', 'ieee', " \
                         "'chicago-note-bibliography', etc. (default 'apa')." },
-                mode: { type: "string",
+                mode: { type: "string", enum: %w[bibliography citation],
                     description: "'bibliography' (default) or 'citation'." },
             },
             required: [],
@@ -840,16 +973,29 @@ module ZoteroMCP
             ZoteroMCP.guard do
                 keys = Array(item_keys)
                 if keys.empty? && collection_key.nil?
-                    next ZoteroMCP.text(
-                        error: "Provide item_keys or collection_key.",
+                    next ZoteroMCP.error_text("Provide item_keys or collection_key.")
+                end
+                if keys.length > MAX_WRITE_BATCH
+                    next ZoteroMCP.error_text(
+                        "At most #{MAX_WRITE_BATCH} item keys per call.",
                     )
                 end
-                entries = ZoteroMCP.client.bibliography(
+                result = ZoteroMCP.client.bibliography(
                     item_keys: keys, collection_key: collection_key,
                     style: style, mode: mode,
                 )
-                ZoteroMCP.text(style: style, mode: mode, entries: entries)
+                ZoteroMCP.text(bibliography_payload(style, mode, result))
             end
+        end
+
+        def self.bibliography_payload(style, mode, result)
+            payload = { style: style, mode: mode, entries: result[:entries] }
+            total = result[:total]
+            if total
+                payload[:total] = total
+                payload[:truncated] = true if total > result[:entries].length
+            end
+            payload
         end
     end
 
@@ -962,6 +1108,12 @@ module ZoteroMCP
         def self.call(note_html:, parent_item_key: nil, tags: nil,
             collection_keys: nil, server_context: nil)
             ZoteroMCP.guard do
+                if parent_item_key && collection_keys
+                    next ZoteroMCP.error_text(
+                        "collection_keys apply only to standalone notes; omit " \
+                            "parent_item_key or collection_keys.",
+                    )
+                end
                 client = ZoteroMCP.client
                 note = client.item_template("note")
                 note["note"] = note_html
@@ -1005,8 +1157,8 @@ module ZoteroMCP
             ZoteroMCP.guard do
                 changes = build_changes(fields, tags, collection_keys)
                 if changes.empty?
-                    next ZoteroMCP.text(
-                        error: "Provide fields, tags, or collection_keys.",
+                    next ZoteroMCP.error_text(
+                        "Provide fields, tags, or collection_keys.",
                     )
                 end
                 ZoteroMCP.text(
@@ -1047,7 +1199,7 @@ module ZoteroMCP
         def self.call(item_keys:, server_context: nil)
             ZoteroMCP.guard do
                 error = ZoteroMCP.batch_error(item_keys)
-                next ZoteroMCP.text(error: error) if error
+                next ZoteroMCP.error_text(error) if error
 
                 ZoteroMCP.text(ZoteroMCP.client.delete_items(item_keys))
             end
@@ -1076,7 +1228,7 @@ module ZoteroMCP
         def self.call(collection_key:, item_keys:, server_context: nil)
             ZoteroMCP.guard do
                 error = ZoteroMCP.batch_error(item_keys)
-                next ZoteroMCP.text(error: error) if error
+                next ZoteroMCP.error_text(error) if error
 
                 ZoteroMCP.text(
                     ZoteroMCP.client.add_to_collection(
@@ -1124,7 +1276,7 @@ module ZoteroMCP
     ].freeze
 
     def self.build_server
-        MCP::Server.new(name: "zotero_mcp", version: "1.0.0", tools: TOOLS)
+        MCP::Server.new(name: "zotero_mcp", version: VERSION, tools: TOOLS)
     end
 end
 

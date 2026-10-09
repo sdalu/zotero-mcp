@@ -4,3 +4,6 @@ zotero-sdalu.txt
 # Installed gems (bundle install / gem install -i); reproducible from the Gemfile
 vendors/
 .bundle/
+
+# Per-checkout notes for Claude sessions
+CLAUDE.local.md

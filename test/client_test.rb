@@ -51,6 +51,83 @@ class ClientTest < Minitest::Test
     end
 
     # ------------------------------------------------------------------ #
+    # Server-said body suffixes (B)
+    # ------------------------------------------------------------------ #
+
+    def test_handle_appends_response_body_to_error_message
+        client = stub_client
+        error = assert_raises(ZoteroMCP::NotAuthorisedError) do
+            client.send(:handle, resp(code: "403", body: "key disabled"))
+        end
+        assert_match(/Server said: key disabled\z/, error.message)
+    end
+
+    def test_handle_omits_suffix_when_body_is_blank
+        client = stub_client
+        error = assert_raises(ZoteroMCP::NotFoundError) do
+            client.send(:handle, resp(code: "404", body: "   "))
+        end
+        refute_match(/Server said/, error.message)
+    end
+
+    def test_handle_truncates_long_response_body
+        client = stub_client
+        error = assert_raises(ZoteroMCP::APIError) do
+            client.send(:handle, resp(code: "500", body: "x" * 600))
+        end
+        assert_match(/Server said: #{"x" * 500}…\z/, error.message)
+    end
+
+    def test_rate_limited_message_includes_body_suffix
+        client = stub_client
+        error = assert_raises(ZoteroMCP::RateLimitedError) do
+            client.send(:handle, resp(code: "429",
+                headers: { "Retry-After" => "5" }, body: "slow down"))
+        end
+        assert_match(/Server said: slow down\z/, error.message)
+    end
+
+    # ------------------------------------------------------------------ #
+    # 503 retry (C)
+    # ------------------------------------------------------------------ #
+
+    def test_service_unavailable_with_retry_after_is_rate_limited
+        client = stub_client
+        error = assert_raises(ZoteroMCP::RateLimitedError) do
+            client.send(:handle, resp(code: "503", headers: { "Retry-After" => "4" }))
+        end
+        assert_equal 4, error.retry_after
+        assert_equal "Service unavailable (503). Retry in 4 seconds.", error.message
+    end
+
+    def test_service_unavailable_with_backoff_is_rate_limited
+        client = stub_client
+        error = assert_raises(ZoteroMCP::RateLimitedError) do
+            client.send(:handle, resp(code: "503", headers: { "Backoff" => "9" }))
+        end
+        assert_equal 9, error.retry_after
+    end
+
+    def test_service_unavailable_without_header_is_api_error
+        client = stub_client
+        assert_raises(ZoteroMCP::APIError) do
+            client.send(:handle, resp(code: "503"))
+        end
+    end
+
+    def test_request_retries_after_503_then_succeeds
+        attempts = 0
+        client = stub_client do |_req|
+            attempts += 1
+            attempts == 1 ? resp(code: "503", headers: { "Retry-After" => "1" }) \
+                          : resp(code: "200", body: { ok: true })
+        end
+        response = client.request(:get, "/users/42/items")
+        assert_equal "200", response.code
+        assert_equal [1], client.sleeps
+    end
+
+    # ------------------------------------------------------------------ #
     # Retry loop
     # ------------------------------------------------------------------ #
 
@@ -209,22 +286,26 @@ class ClientTest < Minitest::Test
             assert_equal "/users/42/items", req[:path]
             assert_equal "bib", req[:params]["include"]
             assert_equal "AAAA1111,BBBB2222", req[:params]["itemKey"]
-            resp(body: [{ "bib" => "Entry one" }, { "bib" => "Entry two" }])
+            resp(body: [{ "bib" => "Entry one" }, { "bib" => "Entry two" }],
+                headers: { "Total-Results" => "2" })
         end
-        entries = client.bibliography(item_keys: %w[AAAA1111 BBBB2222],
+        result = client.bibliography(item_keys: %w[AAAA1111 BBBB2222],
             collection_key: nil, style: "apa", mode: "bibliography")
-        assert_equal ["Entry one", "Entry two"], entries
+        assert_equal ["Entry one", "Entry two"], result[:entries]
+        assert_equal 2, result[:total]
     end
 
-    def test_bibliography_by_collection_and_citation_mode
+    # F: the collection path uses /items/top, so child notes and attachments
+    # pulled in by a collection contribute no bibliography entries.
+    def test_bibliography_by_collection_uses_top_only_path_and_citation_mode
         client = stub_client do |req|
-            assert_equal "/users/42/collections/COL1/items", req[:path]
+            assert_equal "/users/42/collections/COL1/items/top", req[:path]
             assert_equal "citation", req[:params]["include"]
             resp(body: [{ "citation" => "(Ada, 2023)" }, { "bib" => "ignored" }])
         end
-        entries = client.bibliography(item_keys: [], collection_key: "COL1",
+        result = client.bibliography(item_keys: [], collection_key: "COL1",
             style: "ieee", mode: "citation")
-        assert_equal ["(Ada, 2023)"], entries
+        assert_equal ["(Ada, 2023)"], result[:entries]
     end
 
     # ------------------------------------------------------------------ #
@@ -303,6 +384,21 @@ class ClientTest < Minitest::Test
         assert_equal ["ITEM0001"], result[:added]
         patch = client.requests.last
         assert_equal %w[EXIST001 TARGET01], JSON.parse(patch[:body])["collections"]
+    end
+
+    def test_write_json_sends_write_token_once_and_reuses_on_retry
+        tokens = []
+        attempts = 0
+        client = stub_client do |req|
+            tokens << req[:headers]["Zotero-Write-Token"]
+            attempts += 1
+            attempts == 1 ? resp(code: "429", headers: { "Retry-After" => "1" }) \
+                          : resp(body: { "success" => {}, "failed" => {} })
+        end
+        client.create_items([{ "itemType" => "book" }])
+        assert_equal 2, tokens.length
+        assert_match(/\A[0-9a-f]{32}\z/, tokens.first)
+        assert_equal tokens.first, tokens.last
     end
 
     def test_writes_blocked_on_local_config

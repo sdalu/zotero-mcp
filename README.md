@@ -18,7 +18,7 @@ the standard library.
 | `zotero_list_collections` | List collections (folders) | no |
 | `zotero_get_collection_items` | List items inside a collection | no |
 | `zotero_list_tags` | List tags, optionally filtered | no |
-| `zotero_get_item_fulltext` | Indexed full text of an attachment (e.g. a PDF) | no |
+| `zotero_get_item_fulltext` | Indexed full text of an attachment (e.g. a PDF), or of its parent item — the attachment is resolved automatically (PDFs first); paged with `offset`/`max_chars` | no |
 | `zotero_generate_bibliography` | Formatted references in a CSL style (APA, IEEE, …) | no |
 | `zotero_get_item_template` | List item types, or get a blank template + creator types | no |
 | `zotero_create_item` | Create an item from a type template | **yes** |
@@ -39,7 +39,7 @@ the standard library.
 ### 1. Install the dependency
 
 ```bash
-cd zotero-mcp-ruby
+cd mcp-zotero
 bundle install
 ```
 
@@ -65,7 +65,7 @@ claude mcp add zotero --scope user \
   --env ZOTERO_API_KEY=your-zotero-api-key \
   --env ZOTERO_LIBRARY_ID=1234567 \
   --env ZOTERO_LIBRARY_TYPE=user \
-  -- ruby /absolute/path/to/zotero-mcp-ruby/zotero_mcp_server.rb
+  -- ruby /absolute/path/to/mcp-zotero/zotero_mcp_server.rb
 ```
 
 If you installed the gem with Bundler and it is not on the default load path,
@@ -75,8 +75,8 @@ run the script through Bundler instead:
 claude mcp add zotero --scope user \
   --env ZOTERO_API_KEY=your-zotero-api-key \
   --env ZOTERO_LIBRARY_ID=1234567 \
-  --env BUNDLE_GEMFILE=/absolute/path/to/zotero-mcp-ruby/Gemfile \
-  -- bundle exec ruby /absolute/path/to/zotero-mcp-ruby/zotero_mcp_server.rb
+  --env BUNDLE_GEMFILE=/absolute/path/to/mcp-zotero/Gemfile \
+  -- bundle exec ruby /absolute/path/to/mcp-zotero/zotero_mcp_server.rb
 ```
 
 Then check it connected:
@@ -87,7 +87,7 @@ claude mcp list
 
 Inside a Claude Code session, `/mcp` shows the server and its tools.
 
-Prefer editing config by hand? Copy `.mcp.json.example` to `.mcp.json` in your
+Prefer editing config by hand? Copy `mcp.json.example` to `.mcp.json` in your
 project (this shares the server with anyone who has the repo), fill in the
 absolute path and your credentials, and restart Claude Code.
 
@@ -129,8 +129,11 @@ rather than silently clobbering. Passing `tags` or `collection_keys` to update
 The suite is plain [Minitest](https://github.com/minitest/minitest) (Ruby
 stdlib) and never touches the network: a `StubClient` records outgoing requests
 and returns canned responses, so the client, read/write endpoints, formatting,
-and tool `.call` methods are all exercised offline. `test/test_helper.rb` puts
-the vendored `mcp` gem on the gem path, so no `bundle install` is required.
+and tool `.call` methods are all exercised offline; `test/server_test.rb` also
+drives the assembled server through JSON-RPC (`initialize`, `tools/list`,
+`tools/call`). The suite needs the `mcp` gem: either installed for this Ruby,
+or under `vendors/ruby/<ABI>` (what `bundle install` produces when Bundler's
+`path` is set to `vendors`), which `test/test_helper.rb` puts on the gem path.
 
 ```bash
 rake test            # or: ruby test/all.rb
@@ -142,8 +145,8 @@ ruby test/client_test.rb   # a single file
 - Writes are capped at 50 objects per call, matching the Zotero API.
 - Deletes move items to the Zotero **trash**, so they can be restored.
 - The server logs nothing to stdout, as required for stdio MCP servers (stdout
-  carries the JSON-RPC protocol). Errors come back to the client as structured
-  tool results.
+  carries the JSON-RPC protocol). Errors come back to the client as tool results
+  flagged `isError`, carrying Zotero's own explanation when it sends one.
 - Give the API key the narrowest access that fits your use. Use a read-only key
   if you never intend to write.
 
@@ -155,5 +158,6 @@ ruby test/client_test.rb   # a single file
   needed access; write tools require a write-enabled key.
 - **"Version conflict (412)"** — the item changed on the server; re-fetch it
   with `zotero_get_item` and retry.
-- **Full text is empty** — pass the *attachment's* key (not its parent), and
-  make sure Zotero has indexed that attachment.
+- **Full text is empty** — pass the attachment's key, or its parent item's
+  key (the attachment is then resolved automatically, PDFs first), and make
+  sure Zotero has indexed that attachment.

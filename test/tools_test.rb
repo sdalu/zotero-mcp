@@ -72,7 +72,7 @@ class ToolsTest < Minitest::Test
         assert_equal ["NEWKEY01"], text_of(response)["created_keys"]
     end
 
-    def test_create_note_as_child_ignores_collections
+    def test_create_note_as_child_sets_parent_item
         captured = nil
         client = stub_client do |req|
             if req[:method] == :get
@@ -84,11 +84,24 @@ class ToolsTest < Minitest::Test
         end
         with_client(client) do
             ZoteroMCP::CreateNote.call(note_html: "<p>hi</p>",
-                parent_item_key: "PARENT01", collection_keys: ["COL1"])
+                parent_item_key: "PARENT01")
         end
         assert_equal "<p>hi</p>", captured["note"]
         assert_equal "PARENT01", captured["parentItem"]
         refute captured.key?("collections")
+    end
+
+    # H: collection_keys only make sense for a standalone note.
+    def test_create_note_rejects_parent_item_key_with_collection_keys
+        client = stub_client { |_req| flunk "no request should be sent" }
+        response = with_client(client) do
+            ZoteroMCP::CreateNote.call(note_html: "<p>hi</p>",
+                parent_item_key: "PARENT01", collection_keys: ["COL1"])
+        end
+        assert response.error?
+        assert_match(/collection_keys apply only to standalone notes/,
+            text_of(response)["error"])
+        assert_empty client.requests
     end
 
     def test_update_item_requires_some_change
@@ -145,6 +158,164 @@ class ToolsTest < Minitest::Test
         assert_equal "COL1", collection["key"]
         assert_equal "Papers", collection["name"]
         assert_equal 4, collection["numItems"]
+    end
+
+    # ------------------------------------------------------------------ #
+    # Early error returns are flagged as errors (A)
+    # ------------------------------------------------------------------ #
+
+    def test_update_item_without_changes_flags_error
+        response = with_client(stub_client) do
+            ZoteroMCP::UpdateItem.call(item_key: "ITEM0001")
+        end
+        assert response.error?
+    end
+
+    def test_delete_item_rejects_oversized_batch_flags_error
+        big_keys = Array.new(ZoteroMCP::MAX_WRITE_BATCH + 1, "K")
+        response = with_client(stub_client) do
+            ZoteroMCP::DeleteItem.call(item_keys: big_keys)
+        end
+        assert response.error?
+    end
+
+    # ------------------------------------------------------------------ #
+    # Input-schema enums (E)
+    # ------------------------------------------------------------------ #
+
+    def test_search_items_schema_declares_enums
+        properties = ZoteroMCP::SearchItems.input_schema.to_h[:properties]
+        assert_equal %w[titleCreatorYear everything], properties[:qmode][:enum]
+        assert_equal %w[asc desc], properties[:direction][:enum]
+        assert_equal %w[summary json], properties[:response_format][:enum]
+    end
+
+    def test_get_collection_items_schema_declares_response_format_enum
+        properties = ZoteroMCP::GetCollectionItems.input_schema.to_h[:properties]
+        assert_equal %w[summary json], properties[:response_format][:enum]
+    end
+
+    def test_generate_bibliography_schema_declares_mode_enum
+        properties = ZoteroMCP::GenerateBibliography.input_schema.to_h[:properties]
+        assert_equal %w[bibliography citation], properties[:mode][:enum]
+    end
+
+    # ------------------------------------------------------------------ #
+    # Bibliography batch limit and truncation (F)
+    # ------------------------------------------------------------------ #
+
+    def test_generate_bibliography_rejects_too_many_item_keys
+        client = stub_client { |_req| flunk "no request should be sent" }
+        response = with_client(client) do
+            ZoteroMCP::GenerateBibliography.call(
+                item_keys: Array.new(ZoteroMCP::MAX_WRITE_BATCH + 1, "AAAA1111"),
+            )
+        end
+        assert response.error?
+        assert_match(/At most 50 item keys per call/, text_of(response)["error"])
+        assert_empty client.requests
+    end
+
+    def test_generate_bibliography_flags_truncated_results
+        client = stub_client do |_req|
+            resp(body: [{ "bib" => "Ref 1" }], headers: { "Total-Results" => "5" })
+        end
+        response = with_client(client) do
+            ZoteroMCP::GenerateBibliography.call(item_keys: ["AAAA1111"])
+        end
+        payload = text_of(response)
+        assert_equal 5, payload["total"]
+        assert payload["truncated"]
+    end
+
+    # ------------------------------------------------------------------ #
+    # Full-text paging and parent resolution (G)
+    # ------------------------------------------------------------------ #
+
+    def test_get_item_fulltext_pages_content
+        client = stub_client do |_req|
+            resp(body: { "content" => "0123456789", "indexedPages" => 1,
+                "totalPages" => 1 })
+        end
+        response = with_client(client) do
+            ZoteroMCP::GetItemFulltext.call(item_key: "ATT00001", offset: 3, max_chars: 4)
+        end
+        payload = text_of(response)
+        assert_equal "ATT00001", payload["item_key"]
+        assert_equal "3456", payload["content"]
+        assert_equal 3, payload["offset"]
+        assert_equal 4, payload["returned_chars"]
+        assert_equal 10, payload["total_chars"]
+        assert_equal 7, payload["next_offset"]
+        assert_equal 1, payload["indexedPages"]
+        assert_equal 1, payload["totalPages"]
+    end
+
+    def test_get_item_fulltext_omits_next_offset_when_exhausted
+        client = stub_client { |_req| resp(body: { "content" => "hello" }) }
+        response = with_client(client) do
+            ZoteroMCP::GetItemFulltext.call(item_key: "ATT00001")
+        end
+        payload = text_of(response)
+        refute payload.key?("next_offset")
+        assert_equal 5, payload["returned_chars"]
+    end
+
+    def test_get_item_fulltext_prefers_pdf_attachment_over_earlier_non_pdf
+        client = stub_client do |req|
+            if req[:path].end_with?("/items/PARENT1/fulltext")
+                resp(code: "404")
+            elsif req[:path].end_with?("/children")
+                resp(body: [
+                    { "key" => "NOTE0001", "data" => { "itemType" => "note" } },
+                    { "key" => "ATTTXT01", "data" => { "itemType" => "attachment",
+                        "contentType" => "text/plain" } },
+                    { "key" => "ATTPDF01", "data" => { "itemType" => "attachment",
+                        "contentType" => "application/pdf" } },
+                ])
+            elsif req[:path].end_with?("/ATTTXT01/fulltext")
+                resp(body: { "content" => "text content" })
+            elsif req[:path].end_with?("/ATTPDF01/fulltext")
+                resp(body: { "content" => "pdf content" })
+            else
+                resp(code: "404")
+            end
+        end
+        response = with_client(client) do
+            ZoteroMCP::GetItemFulltext.call(item_key: "PARENT1")
+        end
+        payload = text_of(response)
+        assert_equal "ATTPDF01", payload["item_key"]
+        assert_equal "PARENT1", payload["parent_key"]
+        assert_equal "pdf content", payload["content"]
+    end
+
+    def test_get_item_fulltext_raises_not_found_when_no_child_has_text
+        client = stub_client do |req|
+            if req[:path].end_with?("/fulltext")
+                resp(code: "404")
+            elsif req[:path].end_with?("/children")
+                resp(body: [
+                    { "key" => "ATT1", "data" => { "itemType" => "attachment" } },
+                ])
+            else
+                resp(code: "404")
+            end
+        end
+        response = with_client(client) do
+            ZoteroMCP::GetItemFulltext.call(item_key: "PARENT1")
+        end
+        assert response.error?
+        assert_match(/No indexed full text/, text_of(response)["error"])
+    end
+
+    def test_get_item_fulltext_reraises_original_when_children_also_missing
+        client = stub_client { |_req| resp(code: "404", body: "original") }
+        response = with_client(client) do
+            ZoteroMCP::GetItemFulltext.call(item_key: "PARENT1")
+        end
+        assert response.error?
+        assert_match(/Not found/, text_of(response)["error"])
     end
 
     def test_create_collection_nests_under_parent

@@ -266,4 +266,42 @@ class HelpersTest < Minitest::Test
         response = ZoteroMCP.guard { ZoteroMCP.text(ok: true) }
         assert_equal({ "ok" => true }, text_of(response))
     end
+
+    # ------------------------------------------------------------------ #
+    # error_text / guard error flagging (A)
+    # ------------------------------------------------------------------ #
+
+    def test_error_text_sets_error_flag_and_body
+        response = ZoteroMCP.error_text("gone")
+        assert response.error?
+        assert_equal({ "error" => "gone" }, text_of(response))
+    end
+
+    def test_guard_flags_domain_errors_as_error
+        response = ZoteroMCP.guard { raise ZoteroMCP::NotFoundError, "gone" }
+        assert response.error?
+    end
+
+    def test_guard_flags_unexpected_errors_as_error
+        response = ZoteroMCP.guard { raise ArgumentError, "boom" }
+        assert response.error?
+    end
+
+    def test_guard_success_is_not_flagged_as_error
+        response = ZoteroMCP.guard { ZoteroMCP.text(ok: true) }
+        refute response.error?
+    end
+
+    # ------------------------------------------------------------------ #
+    # clamp_max_chars (G)
+    # ------------------------------------------------------------------ #
+
+    def test_clamp_max_chars_defaults_and_caps
+        assert_equal ZoteroMCP::DEFAULT_MAX_CHARS, ZoteroMCP.clamp_max_chars(nil)
+        assert_equal ZoteroMCP::DEFAULT_MAX_CHARS, ZoteroMCP.clamp_max_chars(0)
+        assert_equal ZoteroMCP::DEFAULT_MAX_CHARS, ZoteroMCP.clamp_max_chars(-5)
+        assert_equal ZoteroMCP::DEFAULT_MAX_CHARS, ZoteroMCP.clamp_max_chars("100")
+        assert_equal 500, ZoteroMCP.clamp_max_chars(500)
+        assert_equal ZoteroMCP::MAX_MAX_CHARS, ZoteroMCP.clamp_max_chars(1_000_000)
+    end
 end
