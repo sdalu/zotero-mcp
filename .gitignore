@@ -7,3 +7,4 @@ vendors/
 
 # Per-checkout notes for Claude sessions
 CLAUDE.local.md
+*.gem

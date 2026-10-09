@@ -2,6 +2,5 @@
 
 source "https://rubygems.org"
 
-# Official Model Context Protocol SDK for Ruby. Pulls in json_schemer
-# (>= 2.4) transitively for input-schema validation.
-gem "mcp", "~> 0.22"
+# Runtime dependencies (the mcp gem) are declared in zotero_mcp.gemspec.
+gemspec

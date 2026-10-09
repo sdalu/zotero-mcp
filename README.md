@@ -36,11 +36,21 @@ the standard library.
 
 ## Setup
 
-### 1. Install the dependency
+### 1. Install
+
+Either run it from a checkout:
 
 ```bash
 cd mcp-zotero
 bundle install
+```
+
+or build and install the gem, which puts a `zotero-mcp` command on your
+`PATH` and pulls in the `mcp` gem:
+
+```bash
+gem build zotero_mcp.gemspec
+gem install ./zotero_mcp-*.gem
 ```
 
 ### 2. Get a Zotero API key and library id
@@ -66,6 +76,15 @@ claude mcp add zotero --scope user \
   --env ZOTERO_LIBRARY_ID=1234567 \
   --env ZOTERO_LIBRARY_TYPE=user \
   -- ruby /absolute/path/to/mcp-zotero/zotero_mcp_server.rb
+```
+
+With the gem installed, register its command instead (absolute path from
+`which zotero-mcp`):
+
+```bash
+claude mcp add zotero --scope user \
+  --env ZOTERO_API_KEY=your-zotero-api-key \
+  -- /absolute/path/to/zotero-mcp
 ```
 
 If you installed the gem with Bundler and it is not on the default load path,
@@ -161,3 +180,7 @@ ruby test/client_test.rb   # a single file
 - **Full text is empty** — pass the attachment's key, or its parent item's
   key (the attachment is then resolved automatically, PDFs first), and make
   sure Zotero has indexed that attachment.
+
+## License
+
+MIT; see `LICENSE`.

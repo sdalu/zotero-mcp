@@ -7,9 +7,10 @@ command or a question with a yes or a no at the end of it.
 
 Run in order, from the project directory.
 
-- [ ] `ruby -wc zotero_mcp_server.rb` -- prints `Syntax OK` and no warning.
+- [ ] `ruby -wc lib/zotero_mcp.rb` -- prints `Syntax OK` and no warning.
 - [ ] `rake test` -- 0 failures, 0 errors. Needs the `mcp` gem (see
       README, Tests); a `LoadError` for `mcp` is a missing gem, not a pass.
+- [ ] `gem build zotero_mcp.gemspec` -- builds; then delete the `.gem`.
 - [ ] Did this round add, remove or rename a tool? Then
       `test/server_test.rb` (tool count, schemas) was updated with it.
 - [ ] Did this round add a refusal (an argument rejected, a mode that
@@ -28,7 +29,11 @@ Run in order, from the project directory.
 
 ## Release
 
-- [ ] Does `ZoteroMCP::VERSION` in `zotero_mcp_server.rb` move? A
+- [ ] Does `ZoteroMCP::VERSION` in `lib/zotero_mcp/version.rb` move? A
       changed tool, parameter or result shape is a minor bump, a fix is
-      a patch. It is the only place the number is written; the server
-      reports it to clients at `initialize`. Nothing is tagged.
+      a patch. It is the only file the number is typed in; the gemspec
+      reads it, and the server reports it at `initialize`. Nothing is
+      tagged.
+- [ ] `bundle lock --local` -- if the number moved: Bundler copies it
+      into `Gemfile.lock`, and `test/gemspec_test.rb` fails until it is
+      refreshed.

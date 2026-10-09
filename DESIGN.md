@@ -3,11 +3,15 @@
 Why the Zotero MCP server is shaped the way it is. How to install and use
 it is in `README.md`.
 
-## One file, standard library HTTP
+## One library file, standard library HTTP
 
-The server is a single script, `zotero_mcp_server.rb`, so registering it
-with an MCP client is one absolute path. Its only dependency is the `mcp`
-gem; HTTP goes through `Net::HTTP`. A REST client gem would save little: the Zotero API
+The whole server is `lib/zotero_mcp.rb`; `lib/zotero_mcp/version.rb`
+holds only the version, so the gemspec can read it without loading the
+`mcp` gem. Two launchers call `ZoteroMCP.run`: `exe/zotero-mcp`, which
+the gem installs on the `PATH`, and `zotero_mcp_server.rb` at the root of
+a checkout, so that a registration naming that path needs no gem install
+and keeps working. The only dependency is the `mcp` gem; HTTP goes
+through `Net::HTTP`. A REST client gem would save little: the Zotero API
 needs only GET, POST, PATCH and DELETE with a few headers.
 
 ## Layers

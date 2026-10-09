@@ -17,7 +17,7 @@ require "minitest/autorun"
 
 # Loading the server defines everything under ZoteroMCP without starting the
 # stdio transport (that only runs when the file is the program entry point).
-require_relative "../zotero_mcp_server.rb"
+require_relative "../lib/zotero_mcp"
 
 module TestSupport
     DEFAULT_CONFIG = {
